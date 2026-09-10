@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS AI - Next Generation Intelligence</title>
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/animations.css">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="logo">
+            <span>NEXUS AI</span>
+        </div>
+        <div class="nav-links">
+            <a href="#hero">Home</a>
+            <a href="#services">Services</a>
+            <a href="#demo">Live Demo</a>
+        </div>
+        <div class="nav-actions">
+            <button class="btn-secondary">Sign In</button>
+            <button class="btn-primary">Get Started</button>
+        </div>
+    </nav>
+
+    <section id="hero" class="hero-section">
+        <div class="hero-content fade-in">
+            <h1>Engineered for scalable intelligence</h1>
+            <p class="fade-in-delay">Build, deploy, and scale enterprise-grade AI models with low-latency execution and seamless integration.</p>
+            <div class="hero-buttons fade-in-delay-2">
+                <button class="btn-primary-large">Get Started Right Now</button>
+                <button class="btn-outline-large">Explore Models</button>
+            </div>
+        </div>
+    </section>
+
+    <section id="services" class="services-section">
+        <h2 class="section-title">Core Services</h2>
+        <div class="services-grid">
+            <div class="service-card">
+                <h3>Streaming AI Engine</h3>
+                <p>Real-time server-sent events for instant text & code generation.</p>
+            </div>
+            <div class="service-card">
+                <h3>Multi-Modal Processing</h3>
+                <p>Analyze text, visual documents, and raw datasets in milliseconds.</p>
+            </div>
+            <div class="service-card">
+                <h3>Enterprise Security</h3>
+                <p>JWT-based multi-layer access control with scalable API infrastructure.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="demo" class="demo-section">
+        <h2 class="section-title">Interactive Model Demo</h2>
+        <div class="demo-card">
+            <div class="demo-output" id="demoOutput">Click the button below to stream a response from NEXUS AI...</div>
+            <button class="btn-primary" id="runDemoBtn">Run Simulation</button>
+        </div>
+    </section>
+<section id="contact" style="padding: 50px 20px; max-width: 600px; margin: 0 auto;">
+    <h2 style="text-align: center; margin-bottom: 20px;">Contact Us</h2>
+    <form id="contactForm" style="display: flex; flex-direction: column; gap: 15px;">
+        <input type="text" name="name" id="name" placeholder="Your Name" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
+        <input type="text" name="email" id="email" placeholder="Your Email" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
+        <input type="text" name="subject" id="subject" placeholder="Subject" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
+        <textarea name="message" id="message" rows="5" placeholder="Your Message" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;"></textarea>
+        <button type="submit" id="submitBtn" style="padding: 12px; background: #d97757; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Send Message</button>
+    </form>
+    <div id="responseMessage" style="margin-top: 15px; text-align: center; font-weight: bold;"></div>
+</section>
+    <footer class="footer">
+        <p>&copy; 2026 NEXUS AI Systems Inc. All rights reserved.</p>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

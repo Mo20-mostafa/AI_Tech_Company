@@ -1,0 +1,30 @@
+/* Base Variables & Theme Settings */
+:root {
+    --bg-color: #fbf9f5;         
+    --text-primary: #191919;     
+    --text-secondary: #605e5c;  
+    --accent-color: #d97757;     
+    --accent-hover: #c06345;
+    --card-bg: #ffffff;
+    --border-color: #e5e2dc;
+    --font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    font-family: var(--font-family);
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
