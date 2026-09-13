@@ -38,7 +38,8 @@
 
     <section id="services" class="services-section">
         <h2 class="section-title">Core Services</h2>
-        <div class="services-grid">
+        <!-- أضفنا id="servicesContainer" هنا لتتمكن دالة الجافاسكريبت من استبدال العناصر مباشرة -->
+        <div class="services-grid" id="servicesContainer">
             <div class="service-card">
                 <h3>Streaming AI Engine</h3>
                 <p>Real-time server-sent events for instant text & code generation.</p>
@@ -61,17 +62,19 @@
             <button class="btn-primary" id="runDemoBtn">Run Simulation</button>
         </div>
     </section>
-<section id="contact" style="padding: 50px 20px; max-width: 600px; margin: 0 auto;">
-    <h2 style="text-align: center; margin-bottom: 20px;">Contact Us</h2>
-    <form id="contactForm" style="display: flex; flex-direction: column; gap: 15px;">
-        <input type="text" name="name" id="name" placeholder="Your Name" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
-        <input type="text" name="email" id="email" placeholder="Your Email" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
-        <input type="text" name="subject" id="subject" placeholder="Subject" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
-        <textarea name="message" id="message" rows="5" placeholder="Your Message" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;"></textarea>
-        <button type="submit" id="submitBtn" style="padding: 12px; background: #d97757; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Send Message</button>
-    </form>
-    <div id="responseMessage" style="margin-top: 15px; text-align: center; font-weight: bold;"></div>
-</section>
+
+    <section id="contact" style="padding: 50px 20px; max-width: 600px; margin: 0 auto;">
+        <h2 style="text-align: center; margin-bottom: 20px;">Contact Us</h2>
+        <form id="contactForm" style="display: flex; flex-direction: column; gap: 15px;">
+            <input type="text" name="name" id="name" placeholder="Your Name" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
+            <input type="text" name="email" id="email" placeholder="Your Email" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
+            <input type="text" name="subject" id="subject" placeholder="Subject" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
+            <textarea name="message" id="message" rows="5" placeholder="Your Message" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;"></textarea>
+            <button type="submit" id="submitBtn" style="padding: 12px; background: #d97757; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Send Message</button>
+        </form>
+        <div id="responseMessage" style="margin-top: 15px; text-align: center; font-weight: bold;"></div>
+    </section>
+
     <footer class="footer">
         <p>&copy; 2026 NEXUS AI Systems Inc. All rights reserved.</p>
     </footer>

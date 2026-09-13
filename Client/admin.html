@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS AI - Content Management System</title>
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <style>
+        .admin-container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .services-list-container {
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="logo">
+            <span>NEXUS AI - Admin Panel</span>
+        </div>
+        <div class="nav-links">
+            <a href="index.html">Back to Website</a>
+        </div>
+    </nav>
+
+    <div class="admin-container">
+        <h2>Manage Services (Task 3 - CRUD)</h2>
+        <div id="statusMsg" style="margin-bottom: 15px; font-weight: bold;"></div>
+
+        <form id="serviceForm">
+            <input type="hidden" id="serviceId">
+            <div class="form-group">
+                <label for="title">Service Title</label>
+                <input type="text" id="title" placeholder="Enter service title" required>
+            </div>
+            <div class="form-group">
+                <label for="description">Service Description</label>
+                <textarea id="description" rows="4" placeholder="Enter service description" required></textarea>
+            </div>
+            <div class="btn-group">
+                <button type="submit" id="saveBtn" class="btn-primary" style="padding: 10px 20px;">Add Service</button>
+                <button type="button" id="cancelBtn" class="btn-secondary" style="padding: 10px 20px; display: none;">Cancel</button>
+            </div>
+        </form>
+
+        <hr style="margin: 30px 0; border: 0; border-top: 1px solid #eee;">
+
+        <div class="services-list-container">
+            <h3>Existing Services</h3>
+            <div id="servicesList">
+                <p>Loading services...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/admin.js"></script>
+</body>
+</html>
