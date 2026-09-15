@@ -20,8 +20,8 @@
             <a href="#demo">Live Demo</a>
         </div>
         <div class="nav-actions">
-            <button class="btn-secondary">Sign In</button>
-            <button class="btn-primary">Get Started</button>
+            <a href="login.html" class="btn-secondary" style="text-decoration: none; display: inline-block;">Sign In</a>
+            <a href="login.html" class="btn-primary" style="text-decoration: none; display: inline-block;">Get Started</a>
         </div>
     </nav>
 
@@ -30,15 +30,14 @@
             <h1>Engineered for scalable intelligence</h1>
             <p class="fade-in-delay">Build, deploy, and scale enterprise-grade AI models with low-latency execution and seamless integration.</p>
             <div class="hero-buttons fade-in-delay-2">
-                <button class="btn-primary-large">Get Started Right Now</button>
-                <button class="btn-outline-large">Explore Models</button>
+                <a href="login.html" class="btn-primary-large" style="text-decoration: none; display: inline-block;">Get Started Right Now</a>
+                <a href="#services" class="btn-outline-large" style="text-decoration: none; display: inline-block;">Explore Models</a>
             </div>
         </div>
     </section>
 
     <section id="services" class="services-section">
         <h2 class="section-title">Core Services</h2>
-        <!-- أضفنا id="servicesContainer" هنا لتتمكن دالة الجافاسكريبت من استبدال العناصر مباشرة -->
         <div class="services-grid" id="servicesContainer">
             <div class="service-card">
                 <h3>Streaming AI Engine</h3>
@@ -67,7 +66,7 @@
         <h2 style="text-align: center; margin-bottom: 20px;">Contact Us</h2>
         <form id="contactForm" style="display: flex; flex-direction: column; gap: 15px;">
             <input type="text" name="name" id="name" placeholder="Your Name" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
-            <input type="text" name="email" id="email" placeholder="Your Email" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
+            <input type="email" name="email" id="email" placeholder="Your Email" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
             <input type="text" name="subject" id="subject" placeholder="Subject" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
             <textarea name="message" id="message" rows="5" placeholder="Your Message" style="padding: 10px; border-radius: 5px; border: 1px solid #ccc;"></textarea>
             <button type="submit" id="submitBtn" style="padding: 12px; background: #d97757; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Send Message</button>

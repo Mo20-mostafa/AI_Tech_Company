@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="css/components.css">
     <style>
         .admin-container {
-            max-width: 800px;
+            max-width: 900px;
             margin: 40px auto;
             padding: 20px;
             background: #ffffff;
@@ -30,14 +30,21 @@
             border-radius: 4px;
             box-sizing: border-box;
         }
-        .btn-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
+        .card {
+            border: 1px solid #e0e0e0;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            background-color: #fafafa;
         }
-        .services-list-container {
-            margin-top: 30px;
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
         }
+        .btn-primary { background-color: #cc785c; color: white; }
+        .btn-outline { background-color: transparent; border: 1px solid #cc785c; color: #cc785c; }
     </style>
 </head>
 <body>
@@ -52,32 +59,33 @@
     </nav>
 
     <div class="admin-container">
-        <h2>Manage Services (Task 3 - CRUD)</h2>
-        <div id="statusMsg" style="margin-bottom: 15px; font-weight: bold;"></div>
+        <h2>Manage Services</h2>
 
-        <form id="serviceForm">
-            <input type="hidden" id="serviceId">
+        <form id="service-form">
+            <input type="hidden" id="service-id">
             <div class="form-group">
-                <label for="title">Service Title</label>
-                <input type="text" id="title" placeholder="Enter service title" required>
+                <label for="service-title">Service Title</label>
+                <input type="text" id="service-title" placeholder="Enter service title" required>
             </div>
             <div class="form-group">
-                <label for="description">Service Description</label>
-                <textarea id="description" rows="4" placeholder="Enter service description" required></textarea>
+                <label for="service-desc">Service Description</label>
+                <textarea id="service-desc" rows="4" placeholder="Enter service description" required></textarea>
             </div>
-            <div class="btn-group">
-                <button type="submit" id="saveBtn" class="btn-primary" style="padding: 10px 20px;">Add Service</button>
-                <button type="button" id="cancelBtn" class="btn-secondary" style="padding: 10px 20px; display: none;">Cancel</button>
-            </div>
+            <button type="submit" class="btn btn-primary">Save Service</button>
         </form>
 
         <hr style="margin: 30px 0; border: 0; border-top: 1px solid #eee;">
 
-        <div class="services-list-container">
-            <h3>Existing Services</h3>
-            <div id="servicesList">
-                <p>Loading services...</p>
-            </div>
+        <h3>Existing Services</h3>
+        <div id="services-list">
+            <p>Loading services...</p>
+        </div>
+
+        <hr style="margin: 30px 0; border: 0; border-top: 1px solid #eee;">
+
+        <h3>Customer Inquiries</h3>
+        <div id="inquiries-list">
+            <p>Loading inquiries...</p>
         </div>
     </div>
 

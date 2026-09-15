@@ -1,7 +1,8 @@
+const cors = require('cors');
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 
@@ -16,7 +17,74 @@ mongoose.connect(mongoURI)
     .catch((err) => console.error('MongoDB Connection Error:', err));
 
 
-// 1. TASK 2: Contact & Inquiry System
+// ==========================================
+// 1. User & Authentication System
+// ==========================================
+const userSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now }
+});
+
+const User = mongoose.model('User', userSchema);
+
+// Register Route
+app.post('/api/register', async (req, res) => {
+    try {
+        const { name, email, password } = req.body;
+
+        if (!name?.trim() || !email?.trim() || !password?.trim()) {
+            return res.status(400).json({ success: false, message: 'All fields are required.' });
+        }
+
+        const existingUser = await User.findOne({ email: email.trim().toLowerCase() });
+        if (existingUser) {
+            return res.status(400).json({ success: false, message: 'Email already registered.' });
+        }
+
+        const newUser = new User({
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            password: password.trim()
+        });
+
+        await newUser.save();
+        return res.status(201).json({ success: true, message: 'User registered successfully!' });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Login Route
+app.post('/api/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email?.trim() || !password?.trim()) {
+            return res.status(400).json({ success: false, message: 'Email and password are required.' });
+        }
+
+        const user = await User.findOne({ email: email.trim().toLowerCase(), password: password.trim() });
+        if (!user) {
+            return res.status(400).json({ success: false, message: 'Invalid email or password.' });
+        }
+
+        const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET || 'secretkey', { expiresIn: '1h' });
+
+        return res.json({
+            success: true,
+            token,
+            user: { id: user._id, name: user.name, email: user.email }
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+
+// ==========================================
+// 2. TASK 2: Contact & Inquiry System
 // ==========================================
 const inquirySchema = new mongoose.Schema({
     name: { type: String, required: true },
@@ -48,14 +116,8 @@ app.post('/api/contact', async (req, res) => {
         });
 
         await newInquiry.save();
-        console.log('Saved to Database:', newInquiry);
-
-        return res.status(201).json({
-            success: true,
-            message: 'Thank you! Your inquiry has been received successfully.'
-        });
+        return res.status(201).json({ success: true, message: 'Thank you! Your inquiry has been received successfully.' });
     } catch (error) {
-        console.error('Error handling contact submission:', error);
         return res.status(500).json({ success: false, message: 'Internal Server Error' });
     }
 });
@@ -70,7 +132,8 @@ app.get('/api/inquiries', async (req, res) => {
 });
 
 
-// 2. TASK 3: Services CRUD Operations
+// ==========================================
+// 3. TASK 3: Services CRUD Operations
 // ==========================================
 const serviceSchema = new mongoose.Schema({
     title: { type: String, required: true },
@@ -80,7 +143,6 @@ const serviceSchema = new mongoose.Schema({
 
 const Service = mongoose.model('Service', serviceSchema);
 
-// Read All Services
 app.get('/api/services', async (req, res) => {
     try {
         const services = await Service.find().sort({ createdAt: -1 });
@@ -90,7 +152,6 @@ app.get('/api/services', async (req, res) => {
     }
 });
 
-// Create New Service
 app.post('/api/services', async (req, res) => {
     try {
         const { title, description } = req.body;
@@ -106,7 +167,6 @@ app.post('/api/services', async (req, res) => {
     }
 });
 
-// Update Service
 app.put('/api/services/:id', async (req, res) => {
     try {
         const { title, description } = req.body;
@@ -126,7 +186,6 @@ app.put('/api/services/:id', async (req, res) => {
     }
 });
 
-// Delete Service
 app.delete('/api/services/:id', async (req, res) => {
     try {
         const deletedService = await Service.findByIdAndDelete(req.params.id);
