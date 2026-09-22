@@ -1,4 +1,7 @@
-/* Base Variables & Theme Settings */
+/* ==========================================
+   NEXUS AI - Base Styles & CSS Variables
+   ========================================== */
+
 :root {
     --bg-color: #fbf9f5;         
     --text-primary: #191919;     

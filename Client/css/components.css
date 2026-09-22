@@ -1,3 +1,10 @@
+/* ==========================================
+   NEXUS AI - Layout Components & UI Elements
+   ========================================== */
+
+/* ------------------------------------------
+   1. Navigation Bar
+   ------------------------------------------ */
 .navbar {
     display: flex;
     justify-content: space-between;
@@ -22,6 +29,7 @@
 .nav-links {
     display: flex;
     gap: 2rem;
+    align-items: center;
 }
 
 .nav-links a {
@@ -30,7 +38,8 @@
     transition: color 0.2s ease;
 }
 
-.nav-links a:hover {
+.nav-links a:hover, 
+.nav-links a.active {
     color: var(--text-primary);
 }
 
@@ -38,6 +47,29 @@
     display: flex;
     align-items: center;
     gap: 1rem;
+}
+
+/* ------------------------------------------
+   2. Buttons Framework
+   ------------------------------------------ */
+.btn-primary, 
+.btn-primary-large {
+    padding: 0.8rem 1.8rem;
+    font-size: 0.95rem;
+    background-color: var(--accent-color);
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s ease;
+    display: inline-block;
+    text-align: center;
+}
+
+.btn-primary:hover, 
+.btn-primary-large:hover {
+    background-color: var(--accent-hover);
 }
 
 .btn-secondary {
@@ -55,38 +87,61 @@
     background-color: #f0ede6;
 }
 
-.btn-primary {
-    padding: 0.6rem 1.2rem;
-    font-size: 0.9rem;
+.btn-outline, 
+.btn-outline-large {
+    padding: 0.8rem 1.8rem;
+    font-size: 0.95rem;
+    background-color: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    display: inline-block;
+}
+
+.btn-outline:hover, 
+.btn-outline-large:hover {
+    background-color: #f0ede6;
+}
+
+.btn-primary-block {
+    width: 100%;
+    padding: 0.8rem;
+    font-size: 0.95rem;
     background-color: var(--accent-color);
     color: #ffffff;
     border: none;
     border-radius: 6px;
     cursor: pointer;
+    font-weight: 600;
     transition: background 0.2s ease;
 }
 
-.btn-primary:hover {
+.btn-primary-block:hover {
     background-color: var(--accent-hover);
 }
 
+/* ------------------------------------------
+   3. Hero Section
+   ------------------------------------------ */
 .hero-section {
-    padding: 8rem 2rem 5rem 2rem;
+    padding: 6rem 2rem 4rem 2rem;
     max-width: 900px;
     margin: 0 auto;
     text-align: center;
 }
 
 .hero-content h1 {
-    font-size: 3.2rem;
-    font-weight: 500;
+    font-size: 3rem;
+    font-weight: 600;
     line-height: 1.15;
     letter-spacing: -1px;
     margin-bottom: 1.5rem;
 }
 
 .hero-content p {
-    font-size: 1.25rem;
+    font-size: 1.2rem;
     color: var(--text-secondary);
     margin-bottom: 2.5rem;
     max-width: 700px;
@@ -100,56 +155,30 @@
     gap: 1rem;
 }
 
-.btn-primary-large {
-    padding: 0.9rem 2rem;
-    font-size: 1rem;
-    background-color: var(--accent-color);
-    color: #ffffff;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background 0.2s ease;
-}
-
-.btn-primary-large:hover {
-    background-color: var(--accent-hover);
-}
-
-.btn-outline-large {
-    padding: 0.9rem 2rem;
-    font-size: 1rem;
-    background-color: transparent;
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background 0.2s ease;
-}
-
-.btn-outline-large:hover {
-    background-color: #f0ede6;
-}
-
+/* ------------------------------------------
+   4. Dynamic Services Section (Task 6 Support)
+   ------------------------------------------ */
 .services-section {
-    padding: 6rem 4rem;
+    padding: 4rem 2rem;
     max-width: 1200px;
     margin: 0 auto;
 }
 
 .section-title {
     font-size: 2rem;
-    font-weight: 500;
-    margin-bottom: 3rem;
+    font-weight: 600;
+    margin-bottom: 2.5rem;
     text-align: center;
 }
 
 .services-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 2rem;
 }
 
-.service-card {
+.service-card, 
+.card {
     background-color: var(--card-bg);
     padding: 2.5rem;
     border-radius: 12px;
@@ -157,7 +186,8 @@
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.service-card:hover {
+.service-card:hover, 
+.card:hover {
     transform: translateY(-4px);
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.04);
 }
@@ -173,6 +203,9 @@
     font-size: 0.98rem;
 }
 
+/* ------------------------------------------
+   5. Demo & Interactive Sections
+   ------------------------------------------ */
 .demo-section {
     padding: 4rem 2rem;
     max-width: 800px;
@@ -203,6 +236,100 @@
     color: var(--text-primary);
 }
 
+/* ------------------------------------------
+   6. Form & Contact Control System
+   ------------------------------------------ */
+.contact-section {
+    padding: 4rem 2rem;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1.2rem;
+    text-align: left;
+}
+
+.form-group label {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.95rem;
+    outline: none;
+    background-color: var(--card-bg);
+    color: var(--text-primary);
+    box-sizing: border-box;
+    transition: border-color 0.2s ease;
+}
+
+.form-control:focus {
+    border-color: var(--accent-color);
+}
+
+textarea.form-control {
+    resize: vertical;
+    min-height: 120px;
+}
+
+/* ------------------------------------------
+   7. Authentication Container & Cards
+   ------------------------------------------ */
+.auth-container {
+    max-width: 420px;
+    margin: 4rem auto;
+    padding: 0 1.5rem;
+}
+
+.auth-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 2.5rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.02);
+}
+
+.auth-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    background-color: var(--bg-color);
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.auth-tab-btn {
+    flex: 1;
+    padding: 0.6rem;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.auth-tab-btn.active {
+    background-color: #ffffff;
+    color: var(--text-primary);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+/* ------------------------------------------
+   8. Footer Layout
+   ------------------------------------------ */
 .footer {
     text-align: center;
     padding: 3rem 1rem;
@@ -212,20 +339,23 @@
     margin-top: 4rem;
 }
 
+/* ------------------------------------------
+   9. Mobile Responsiveness
+   ------------------------------------------ */
 @media (max-width: 768px) {
-    .navbar {
-        padding: 1rem 1.5rem;
+    .navbar { 
+        padding: 1rem 1.5rem; 
     }
-    .nav-links {
-        display: none;
+    .nav-links { 
+        display: none; 
     }
-    .hero-content h1 {
-        font-size: 2.2rem;
+    .hero-content h1 { 
+        font-size: 2.2rem; 
     }
-    .hero-buttons {
-        flex-direction: column;
+    .hero-buttons { 
+        flex-direction: column; 
     }
-    .services-section {
-        padding: 4rem 1.5rem;
+    .services-section { 
+        padding: 3rem 1.5rem; 
     }
 }
