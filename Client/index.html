@@ -10,8 +10,11 @@
         
         .navbar { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 8%; background: #FBF9F5; border-bottom: 1px solid #E5E7EB; position: sticky; top: 0; z-index: 100; }
         .logo { font-size: 1.4rem; font-weight: 800; color: #111827; text-decoration: none; letter-spacing: -0.5px; }
-        .nav-links a { color: #4B5563; text-decoration: none; margin-left: 2rem; font-weight: 500; font-size: 0.95rem; transition: color 0.2s; }
+        .nav-links { display: flex; align-items: center; gap: 2rem; }
+        .nav-links a { color: #4B5563; text-decoration: none; font-weight: 500; font-size: 0.95rem; transition: color 0.2s; }
         .nav-links a:hover { color: #111827; }
+        .btn-nav-action { background: #D97757; color: #FFFFFF !important; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600 !important; }
+        .btn-nav-action:hover { background: #C56547; }
         
         .hero { text-align: center; padding: 5rem 1rem 3rem; background: #FBF9F5; }
         .hero h1 { font-size: 2.8rem; margin-bottom: 1rem; color: #111827; font-weight: 700; letter-spacing: -1px; }
@@ -46,6 +49,7 @@
             <a href="#services">Services</a>
             <a href="#contact">Contact</a>
             <a href="login.html" id="auth-link">Account / Login</a>
+            <a href="dashboard.html" id="request-btn" class="btn-nav-action" style="display: none;">Submit Request</a>
         </nav>
     </header>
 
@@ -90,17 +94,18 @@
     <script>
         const API_URL = 'http://localhost:5000/api';
 
+        // Fetch Dynamic Services from API
         async function fetchServices() {
             const container = document.getElementById('services-container');
             try {
                 const response = await fetch(`${API_URL}/services`);
                 const result = await response.json();
 
-                if (result.success && result.data.length > 0) {
+                if (result.success && result.data && result.data.length > 0) {
                     container.innerHTML = result.data.map(service => `
                         <div class="card">
-                            <h3>${service.title}</h3>
-                            <p>${service.description}</p>
+                            <h3>${escapeHTML(service.title)}</h3>
+                            <p>${escapeHTML(service.description)}</p>
                         </div>
                     `).join('');
                 } else {
@@ -111,29 +116,40 @@
             }
         }
 
+        // Contact Form Submission (Task 2)
         document.getElementById('contactForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const msgDiv = document.getElementById('contact-msg');
             msgDiv.textContent = '';
 
             const payload = {
-                name: document.getElementById('c-name').value,
-                email: document.getElementById('c-email').value,
-                subject: document.getElementById('c-subject').value,
-                message: document.getElementById('c-message').value
+                name: document.getElementById('c-name').value.trim(),
+                email: document.getElementById('c-email').value.trim(),
+                subject: document.getElementById('c-subject').value.trim(),
+                message: document.getElementById('c-message').value.trim()
             };
 
             try {
-                const res = await fetch(`${API_URL}/contact`, {
+                // Try submitting to primary route /inquiries first, fallback to /contact
+                let res = await fetch(`${API_URL}/inquiries`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
+
+                if (res.status === 404) {
+                    res = await fetch(`${API_URL}/contact`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
+
                 const data = await res.json();
 
                 if (res.ok && data.success) {
                     msgDiv.style.color = '#10B981';
-                    msgDiv.textContent = data.message;
+                    msgDiv.textContent = data.message || 'Thank you for your inquiry! We will get back to you soon.';
                     document.getElementById('contactForm').reset();
                 } else {
                     msgDiv.style.color = '#EF4444';
@@ -145,17 +161,26 @@
             }
         });
 
+        // Dynamic Auth Header Setup
         const token = localStorage.getItem('token');
         if (token) {
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             const link = document.getElementById('auth-link');
+            const reqBtn = document.getElementById('request-btn');
+
             if (user.role === 'admin') {
                 link.href = 'admin.html';
                 link.textContent = 'Admin Panel';
             } else {
                 link.href = 'dashboard.html';
                 link.textContent = 'My Dashboard';
+                if (reqBtn) reqBtn.style.display = 'inline-block';
             }
+        }
+
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
         }
 
         fetchServices();

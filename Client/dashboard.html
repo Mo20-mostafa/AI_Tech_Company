@@ -8,19 +8,31 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background-color: #FBF9F5; color: #1F2937; padding: 2rem; }
         
-        .header { display: flex; justify-content: space-between; align-items: center; max-width: 600px; margin: 0 auto 2rem; }
+        .header { display: flex; justify-content: space-between; align-items: center; max-width: 750px; margin: 0 auto 2rem; }
         .header h2 { font-size: 1.8rem; color: #111827; }
         
-        .dash-card { max-width: 600px; margin: 0 auto; background: #FFFFFF; padding: 2.5rem; border-radius: 12px; border: 1px solid #E5E7EB; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .dash-card { max-width: 750px; margin: 0 auto 2rem; background: #FFFFFF; padding: 2.5rem; border-radius: 12px; border: 1px solid #E5E7EB; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .form-group { margin-bottom: 1.25rem; }
         .form-group label { display: block; margin-bottom: 0.4rem; color: #374151; font-weight: 500; font-size: 0.9rem; }
         .form-control { width: 100%; padding: 0.75rem; background: #FFFFFF; border: 1px solid #D1D5DB; color: #111827; border-radius: 8px; font-size: 0.95rem; outline: none; }
         .form-control:focus { border-color: #D97757; }
+        textarea.form-control { resize: vertical; min-height: 100px; }
         
         .btn { padding: 0.75rem 1.5rem; background: #D97757; color: #FFFFFF; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
         .btn:hover { background: #C56547; }
         .btn-logout { background: #E5E7EB; color: #374151; }
         .btn-logout:hover { background: #D1D5DB; }
+
+        /* Badge Styles for Request Status */
+        .badge { padding: 4px 10px; border-radius: 12px; font-size: 0.82rem; font-weight: 600; display: inline-block; }
+        .badge-pending { background-color: #FEF3C7; color: #92400E; }
+        .badge-progress { background-color: #E0F2FE; color: #075985; }
+        .badge-completed { background-color: #D1FAE5; color: #065F46; }
+        .badge-rejected { background-color: #FEE2E2; color: #991B1B; }
+
+        .request-item { padding: 1.25rem; border: 1px solid #E5E7EB; border-radius: 8px; margin-bottom: 1rem; background-color: #FAFAFA; }
+        .request-item:last-child { margin-bottom: 0; }
+        .request-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
     </style>
 </head>
 <body>
@@ -30,6 +42,7 @@
         <button class="btn btn-logout" onclick="logout()">Logout</button>
     </div>
 
+    <!-- Section 1: User Profile -->
     <div class="dash-card">
         <h3 style="margin-bottom: 1.5rem; color: #111827; font-size: 1.25rem;">Your Profile Details</h3>
         <form id="profileForm">
@@ -50,6 +63,31 @@
         </form>
     </div>
 
+    <!-- Section 2: Task 7 - Submit New Request -->
+    <div class="dash-card">
+        <h3 style="margin-bottom: 1.5rem; color: #111827; font-size: 1.25rem;">Submit New Service Request</h3>
+        <form id="createRequestForm">
+            <div class="form-group">
+                <label for="reqTitle">Request Title / Topic</label>
+                <input type="text" id="reqTitle" class="form-control" placeholder="e.g., AI Model Customization Request" required>
+            </div>
+            <div class="form-group">
+                <label for="reqDescription">Detailed Description</label>
+                <textarea id="reqDescription" class="form-control" placeholder="Describe what you need in detail..." required></textarea>
+            </div>
+            <button type="submit" class="btn">Submit Request</button>
+            <span id="req-msg" style="margin-left: 1rem; font-weight: 600; font-size: 0.9rem;"></span>
+        </form>
+    </div>
+
+    <!-- Section 3: Task 7 - Track Submitted Requests -->
+    <div class="dash-card">
+        <h3 style="margin-bottom: 1.5rem; color: #111827; font-size: 1.25rem;">My Submitted Requests</h3>
+        <div id="userRequestsList">
+            <p style="text-align: center; color: #6B7280;">Loading requests...</p>
+        </div>
+    </div>
+
     <script>
         const API_URL = 'http://localhost:5000/api';
         const token = localStorage.getItem('token');
@@ -58,6 +96,7 @@
             window.location.href = 'login.html';
         }
 
+        // 1. Fetch Profile Info
         async function loadProfile() {
             try {
                 const res = await fetch(`${API_URL}/user/profile`, {
@@ -72,10 +111,11 @@
                     logout();
                 }
             } catch (err) {
-                console.error(err);
+                console.error('Profile fetch error:', err);
             }
         }
 
+        // 2. Update Profile Form
         document.getElementById('profileForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const msg = document.getElementById('p-msg');
@@ -100,10 +140,10 @@
 
                 if (res.ok && data.success) {
                     msg.style.color = '#10B981';
-                    msg.textContent = data.message;
+                    msg.textContent = data.message || 'Profile updated!';
                 } else {
                     msg.style.color = '#EF4444';
-                    msg.textContent = data.message;
+                    msg.textContent = data.message || 'Update failed.';
                 }
             } catch (err) {
                 msg.style.color = '#EF4444';
@@ -111,12 +151,94 @@
             }
         });
 
+        // 3. Task 7: Submit New Request Handler
+        document.getElementById('createRequestForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msg = document.getElementById('req-msg');
+            msg.textContent = '';
+
+            const title = document.getElementById('reqTitle').value.trim();
+            const description = document.getElementById('reqDescription').value.trim();
+
+            try {
+                const res = await fetch(`${API_URL}/requests`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ title, description })
+                });
+
+                const data = await res.json();
+
+                if (res.ok && data.success) {
+                    msg.style.color = '#10B981';
+                    msg.textContent = 'Request submitted successfully!';
+                    document.getElementById('createRequestForm').reset();
+                    loadUserRequests(); // Reload list
+                } else {
+                    msg.style.color = '#EF4444';
+                    msg.textContent = data.message || 'Submission failed.';
+                }
+            } catch (err) {
+                msg.style.color = '#EF4444';
+                msg.textContent = 'Server error during submission.';
+            }
+        });
+
+        // 4. Task 7: Load Submitted Requests
+        async function loadUserRequests() {
+            const listContainer = document.getElementById('userRequestsList');
+
+            try {
+                const res = await fetch(`${API_URL}/user/requests`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await res.json();
+                const requests = result.data || (Array.isArray(result) ? result : []);
+
+                if (requests.length === 0) {
+                    listContainer.innerHTML = '<p style="text-align: center; color: #6B7280;">No requests submitted yet.</p>';
+                    return;
+                }
+
+                listContainer.innerHTML = requests.map(req => {
+                    let badgeClass = 'badge-pending';
+                    if (req.status === 'In Progress') badgeClass = 'badge-progress';
+                    if (req.status === 'Completed') badgeClass = 'badge-completed';
+                    if (req.status === 'Rejected') badgeClass = 'badge-rejected';
+
+                    return `
+                        <div class="request-item">
+                            <div class="request-header">
+                                <h4 style="font-size: 1.05rem; color: #111827;">${escapeHTML(req.title)}</h4>
+                                <span class="badge ${badgeClass}">${escapeHTML(req.status)}</span>
+                            </div>
+                            <p style="color: #4B5563; font-size: 0.95rem; margin-bottom: 0.5rem; line-height: 1.4;">${escapeHTML(req.description)}</p>
+                            <small style="color: #9CA3AF;">Date: ${new Date(req.createdAt || Date.now()).toLocaleDateString()}</small>
+                        </div>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error('Requests load error:', err);
+                listContainer.innerHTML = '<p style="text-align: center; color: #EF4444;">Failed to load requests.</p>';
+            }
+        }
+
         function logout() {
             localStorage.clear();
             window.location.href = 'login.html';
         }
 
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+        }
+
+        // Initialize Page Data
         loadProfile();
+        loadUserRequests();
     </script>
 </body>
 </html>

@@ -76,7 +76,6 @@
     </div>
 
     <script>
-        // Backend API Endpoint Base URL
         const API_URL = 'http://localhost:5000/api';
 
         // Tab Switching Logic
@@ -100,17 +99,17 @@
             }
         }
 
-        // Handle Public User Registration Logic
+        // Handle User Registration
         document.getElementById('formRegister').addEventListener('submit', async (e) => {
             e.preventDefault();
             const msg = document.getElementById('alert-msg');
             msg.textContent = '';
 
             const payload = {
-                name: document.getElementById('r-name').value,
-                email: document.getElementById('r-email').value,
+                name: document.getElementById('r-name').value.trim(),
+                email: document.getElementById('r-email').value.trim(),
                 password: document.getElementById('r-password').value,
-                role: 'user' // Strictly enforced standard role
+                role: 'user'
             };
 
             try {
@@ -135,13 +134,13 @@
             }
         });
 
-        // Handle Authentication Login Logic (User & Admin)
+        // Handle Login Logic
         document.getElementById('formLogin').addEventListener('submit', async (e) => {
             e.preventDefault();
             const msg = document.getElementById('alert-msg');
             msg.textContent = '';
 
-            const email = document.getElementById('l-email').value;
+            const email = document.getElementById('l-email').value.trim();
             const password = document.getElementById('l-password').value;
 
             try {
@@ -153,11 +152,9 @@
                 const data = await res.json();
 
                 if (res.ok && data.success) {
-                    // Store Session Data in Local Storage
                     localStorage.setItem('token', data.token);
                     localStorage.setItem('user', JSON.stringify(data.user));
 
-                    // Route based on User Role provided by backend
                     if (data.user.role === 'admin') {
                         window.location.href = 'admin.html';
                     } else {

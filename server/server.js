@@ -94,6 +94,35 @@ const serviceSchema = new mongoose.Schema({
 });
 const Service = mongoose.model('Service', serviceSchema);
 
+// Customer Request Schema (Task 7 - Scalable Structure)
+const requestSchema = new mongoose.Schema({
+    userId: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'User', 
+        required: true 
+    },
+    title: { 
+        type: String, 
+        required: true, 
+        trim: true 
+    },
+    description: { 
+        type: String, 
+        required: true, 
+        trim: true 
+    },
+    status: { 
+        type: String, 
+        enum: ['Pending', 'In Progress', 'Completed', 'Rejected'], 
+        default: 'Pending' 
+    },
+    createdAt: { 
+        type: Date, 
+        default: Date.now 
+    }
+});
+const Request = mongoose.model('Request', requestSchema);
+
 // ==========================================
 // AUTOMATIC ADMIN ACCOUNT SEEDER
 // ==========================================
@@ -391,6 +420,88 @@ app.delete('/api/services/:id', authenticateToken, requireAdmin, async (req, res
         return res.json({ success: true, message: 'Service deleted successfully!' });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ==========================================
+// TASK 7: CUSTOMER REQUEST MANAGEMENT ROUTES
+// ==========================================
+
+// Customer-Side: Submit a new request (Protected)
+app.post('/api/requests', authenticateToken, async (req, res) => {
+    try {
+        const { title, description } = req.body;
+
+        if (!title?.trim() || !description?.trim()) {
+            return res.status(400).json({ success: false, message: 'Title and description are required.' });
+        }
+
+        const newRequest = new Request({
+            userId: req.user.id,
+            title: title.trim(),
+            description: description.trim()
+        });
+
+        await newRequest.save();
+        return res.status(201).json({ 
+            success: true, 
+            message: 'Request submitted successfully!', 
+            data: newRequest 
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: 'Server error while submitting request.', error: err.message });
+    }
+});
+
+// Customer-Side: Fetch logged-in user's requests (Protected)
+app.get('/api/user/requests', authenticateToken, async (req, res) => {
+    try {
+        const userRequests = await Request.find({ userId: req.user.id }).sort({ createdAt: -1 });
+        return res.json({ success: true, data: userRequests });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: 'Server error fetching requests.', error: err.message });
+    }
+});
+
+// Company-Side (Admin Only): Fetch all customer requests (Protected + Admin)
+app.get('/api/admin/requests', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const allRequests = await Request.find()
+            .populate('userId', 'name email')
+            .sort({ createdAt: -1 });
+        return res.json({ success: true, data: allRequests });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: 'Server error fetching all requests.', error: err.message });
+    }
+});
+
+// Company-Side (Admin Only): Update request status (Protected + Admin)
+app.put('/api/admin/requests/:id/status', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { status } = req.body;
+        const validStatuses = ['Pending', 'In Progress', 'Completed', 'Rejected'];
+
+        if (!status || !validStatuses.includes(status)) {
+            return res.status(400).json({ success: false, message: 'Invalid or missing status value.' });
+        }
+
+        const updatedRequest = await Request.findByIdAndUpdate(
+            req.params.id,
+            { status },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedRequest) {
+            return res.status(404).json({ success: false, message: 'Request not found.' });
+        }
+
+        return res.json({ 
+            success: true, 
+            message: 'Request status updated successfully!', 
+            data: updatedRequest 
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: 'Server error updating request status.', error: err.message });
     }
 });
 
