@@ -19,6 +19,10 @@
         .form-control { width: 100%; padding: 0.65rem; background: #FFFFFF; border: 1px solid #D1D5DB; color: #111827; border-radius: 6px; font-size: 0.9rem; outline: none; }
         .form-control:focus { border-color: #D97757; }
         
+        /* Task 8 UI: Admin Search & Filter Controls */
+        .filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .filter-bar input, .filter-bar select { flex: 1; min-width: 120px; }
+
         .btn { padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: background 0.2s; }
         .btn-primary { background: #D97757; color: #FFFFFF; }
         .btn-primary:hover { background: #C56547; }
@@ -44,9 +48,9 @@
     </div>
 
     <div class="admin-grid">
-        <!-- 1. CRUD Services & Simulation (Task 3 & Task 6) -->
+        <!-- 1. CRUD Services & Search/Filter (Task 3, 6 & Task 8) -->
         <div class="card">
-            <h3>Manage Services (Task 6)</h3>
+            <h3>Manage Services (Task 6 & 8)</h3>
             <form id="serviceForm">
                 <input type="hidden" id="s-id">
                 <div class="form-group">
@@ -60,7 +64,19 @@
                 <button type="submit" class="btn btn-primary" id="btn-save">Save Service</button>
             </form>
 
-            <h4 style="margin: 2rem 0 1rem 0; color: #111827;">Live Services</h4>
+            <h4 style="margin: 2rem 0 0.75rem 0; color: #111827;">Live Services</h4>
+            
+            <!-- Task 8: Search & Sort for Admin Services -->
+            <div class="filter-bar">
+                <input type="text" id="adminServiceSearch" class="form-control" placeholder="🔍 Search services..." />
+                <select id="adminServiceSort" class="form-control">
+                    <option value="newest">Newest</option>
+                    <option value="oldest">Oldest</option>
+                    <option value="title_asc">Title A-Z</option>
+                    <option value="title_desc">Title Z-A</option>
+                </select>
+            </div>
+
             <div id="admin-services-list">Loading active services...</div>
         </div>
 
@@ -70,9 +86,21 @@
             <div id="admin-inquiries-list">Loading inquiries...</div>
         </div>
 
-        <!-- 3. Task 7 - Company Side Request Management -->
+        <!-- 3. Task 7 & 8 - Company Side Request Management with Status Filter -->
         <div class="card">
-            <h3>Customer Requests (Task 7)</h3>
+            <h3>Customer Requests (Task 7 & 8)</h3>
+            
+            <!-- Task 8: Status Filter for Requests -->
+            <div class="filter-bar">
+                <select id="adminRequestFilter" class="form-control">
+                    <option value="All">All Statuses</option>
+                    <option value="Pending">Pending</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Rejected">Rejected</option>
+                </select>
+            </div>
+
             <div id="admin-requests-list">Loading customer requests...</div>
         </div>
     </div>
@@ -87,14 +115,22 @@
             window.location.href = 'login.html';
         }
 
-        // 1. Task 6: Load Services
+        // 1. Task 6 & 8: Load Services with Search & Sort
         async function loadAdminServices() {
             const list = document.getElementById('admin-services-list');
+            const searchVal = document.getElementById('adminServiceSearch')?.value || '';
+            const sortVal = document.getElementById('adminServiceSort')?.value || 'newest';
+
+            const queryParams = new URLSearchParams({
+                search: searchVal,
+                sortBy: sortVal
+            });
+
             try {
-                const res = await fetch(`${API_URL}/services`);
+                const res = await fetch(`${API_URL}/services?${queryParams.toString()}`);
                 const result = await res.json();
 
-                if (result.success && result.data.length > 0) {
+                if (result.success && result.data && result.data.length > 0) {
                     list.innerHTML = result.data.map(item => `
                         <div class="service-item">
                             <h4>${escapeHTML(item.title)}</h4>
@@ -106,7 +142,7 @@
                         </div>
                     `).join('');
                 } else {
-                    list.innerHTML = '<p style="color:#6B7280; font-size:0.9rem;">No services created yet.</p>';
+                    list.innerHTML = '<p style="color:#6B7280; font-size:0.9rem;">No matching services found.</p>';
                 }
             } catch (err) {
                 list.innerHTML = '<p style="color:#EF4444">Error loading services.</p>';
@@ -193,16 +229,22 @@
             }
         }
 
-        // 3. Task 7: Load Customer Requests
+        // 3. Task 7 & 8: Load Customer Requests with Filter
         async function loadAdminRequests() {
             const list = document.getElementById('admin-requests-list');
+            const statusFilter = document.getElementById('adminRequestFilter')?.value || 'All';
+
             try {
                 const res = await fetch(`${API_URL}/admin/requests`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const result = await res.json();
 
-                const requests = result.data || (Array.isArray(result) ? result : []);
+                let requests = result.data || (Array.isArray(result) ? result : []);
+
+                if (statusFilter !== 'All') {
+                    requests = requests.filter(r => r.status === statusFilter);
+                }
 
                 if (requests.length > 0) {
                     list.innerHTML = requests.map(req => {
@@ -227,7 +269,7 @@
                         `;
                     }).join('');
                 } else {
-                    list.innerHTML = '<p style="color:#6B7280; font-size:0.9rem;">No requests submitted yet.</p>';
+                    list.innerHTML = '<p style="color:#6B7280; font-size:0.9rem;">No requests found matching criteria.</p>';
                 }
             } catch (err) {
                 console.error('Requests load error:', err);
@@ -259,6 +301,27 @@
             }
         }
 
+        // Event Listeners setup for Task 8 Search & Filter
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchInput = document.getElementById('adminServiceSearch');
+            const sortSelect = document.getElementById('adminServiceSort');
+            const reqFilterSelect = document.getElementById('adminRequestFilter');
+
+            if (searchInput) {
+                searchInput.addEventListener('input', debounce(() => loadAdminServices(), 300));
+            }
+            if (sortSelect) {
+                sortSelect.addEventListener('change', () => loadAdminServices());
+            }
+            if (reqFilterSelect) {
+                reqFilterSelect.addEventListener('change', () => loadAdminRequests());
+            }
+
+            loadAdminServices();
+            loadInquiries();
+            loadAdminRequests();
+        });
+
         function logout() {
             localStorage.clear();
             window.location.href = 'login.html';
@@ -274,10 +337,13 @@
             return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
         }
 
-        // Initialize Admin Dashboard Functions
-        loadAdminServices();
-        loadInquiries();
-        loadAdminRequests();
+        function debounce(func, delay = 300) {
+            let timeout;
+            return (...args) => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), delay);
+            };
+        }
     </script>
 </body>
 </html>

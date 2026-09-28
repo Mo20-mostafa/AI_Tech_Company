@@ -1,40 +1,62 @@
 /* ==========================================
    NEXUS AI - Internal Service Management Logic
-   Task 6 (Services CMS) & Task 7 (Request Management)
+   Task 6 (Services CMS), Task 7 (Request Management) & Task 8 (Search & Filtering)
    ========================================== */
 
 const SERVICES_API_URL = 'http://localhost:5000/api/services';
 const REQUESTS_API_URL = 'http://localhost:5000/api/admin/requests';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Verify Authorization & Admin Permissions (RBAC Rule 5)
+    // 1. Verify Authorization & Admin Permissions
     checkAdminAuth();
 
-    // 2. Fetch existing services from database (Task 6)
+    // 2. Initial Fetch for Services and Customer Requests
     loadAdminServices();
-
-    // 3. Fetch customer submitted requests (Task 7)
     loadAdminRequests();
 
-    // 4. Attach Form Submit Event for Create & Update Operations (Task 6)
+    // 3. Attach Form Submit Event for Create & Update Operations
     const serviceForm = document.getElementById('serviceForm');
     if (serviceForm) {
         serviceForm.addEventListener('submit', handleServiceSubmit);
     }
 
-    // 5. Cancel Edit Mode Event
+    // 4. Cancel Edit Mode Event
     const cancelEditBtn = document.getElementById('cancelEditBtn');
     if (cancelEditBtn) {
         cancelEditBtn.addEventListener('click', resetForm);
     }
 
-    // 6. Logout Handler
+    // 5. Logout Handler
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             window.location.href = 'login.html';
+        });
+    }
+
+    // 6. Task 8: Real-time Search & Sorting Event Listeners for Services
+    const adminSearchInput = document.getElementById('adminSearchInput');
+    const adminSortSelect = document.getElementById('adminSortSelect');
+
+    if (adminSearchInput) {
+        adminSearchInput.addEventListener('input', debounce(() => {
+            loadAdminServices();
+        }, 300));
+    }
+
+    if (adminSortSelect) {
+        adminSortSelect.addEventListener('change', () => {
+            loadAdminServices();
+        });
+    }
+
+    // 7. Task 8: Filter Event Listener for Customer Requests Status
+    const requestStatusFilter = document.getElementById('requestStatusFilter');
+    if (requestStatusFilter) {
+        requestStatusFilter.addEventListener('change', () => {
+            loadAdminRequests();
         });
     }
 });
@@ -64,23 +86,33 @@ function getAdminAuthHeaders() {
 }
 
 // ==========================================
-// TASK 6: SERVICE MANAGEMENT (CMS)
+// TASK 6 & TASK 8: SERVICE MANAGEMENT & DYNAMIC SEARCH/FILTER
 // ==========================================
 
 /**
- * Fetch and display all active services from backend (Task 6 - Req 2)
+ * Fetch and display services with Backend Search & Sorting criteria (Task 8)
  */
 async function loadAdminServices() {
     const grid = document.getElementById('adminServicesGrid');
     if (!grid) return;
 
+    // Read values from search and filter UI inputs
+    const searchVal = document.getElementById('adminSearchInput')?.value || '';
+    const sortVal = document.getElementById('adminSortSelect')?.value || 'newest';
+
+    // Construct API query string dynamically (Backend Search & Filter)
+    const queryParams = new URLSearchParams({
+        search: searchVal,
+        sortBy: sortVal
+    });
+
     try {
-        const response = await fetch(SERVICES_API_URL);
+        const response = await fetch(`${SERVICES_API_URL}?${queryParams.toString()}`);
         const result = await response.json();
         const services = result.data || (Array.isArray(result) ? result : []);
 
         if (services.length === 0) {
-            grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #666;">No active services found.</p>';
+            grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #666;">No services match your search criteria.</p>';
             return;
         }
 
@@ -100,7 +132,7 @@ async function loadAdminServices() {
 }
 
 /**
- * Handle Service Creation (POST) & Updates (PUT) (Task 6 - Req 1 & 3)
+ * Handle Service Creation (POST) & Updates (PUT)
  */
 async function handleServiceSubmit(e) {
     e.preventDefault();
@@ -125,7 +157,7 @@ async function handleServiceSubmit(e) {
             statusMsg.style.color = 'green';
             statusMsg.innerText = id ? '✅ Service updated successfully!' : '✅ Service created successfully!';
             resetForm();
-            loadAdminServices(); // Refresh admin view
+            loadAdminServices(); // Refresh admin services view with updated list
         } else {
             statusMsg.style.color = 'red';
             statusMsg.innerText = '❌ Error: ' + (data.message || 'Operation failed');
@@ -150,7 +182,7 @@ function prepareEdit(id, title, description) {
 }
 
 /**
- * Delete a Service from the Database (DELETE) (Task 6 - Req 4)
+ * Delete a Service from the Database (DELETE)
  */
 async function deleteService(id) {
     if (!confirm('Are you sure you want to delete this service?')) return;
@@ -162,7 +194,7 @@ async function deleteService(id) {
         });
 
         if (response.ok) {
-            loadAdminServices(); // Refresh view after deletion
+            loadAdminServices();
         } else {
             alert('Failed to delete service.');
         }
@@ -175,7 +207,8 @@ async function deleteService(id) {
  * Reset Form inputs and buttons state
  */
 function resetForm() {
-    document.getElementById('serviceForm').reset();
+    const serviceForm = document.getElementById('serviceForm');
+    if (serviceForm) serviceForm.reset();
     document.getElementById('serviceId').value = '';
     document.getElementById('formTitle').innerText = 'Create New Service';
     document.getElementById('submitServiceBtn').innerText = 'Save Service';
@@ -183,11 +216,11 @@ function resetForm() {
 }
 
 // ==========================================
-// TASK 7: COMPANY-SIDE REQUEST MANAGEMENT
+// TASK 7 & TASK 8: REQUEST MANAGEMENT & STATUS FILTERING
 // ==========================================
 
 /**
- * Fetches and displays all customer requests for Company/Admin review.
+ * Fetches and displays customer requests with optional Status Filtering (Task 8)
  */
 async function loadAdminRequests() {
     const container = document.getElementById('adminRequestsContainer') 
@@ -196,16 +229,23 @@ async function loadAdminRequests() {
 
     if (!container) return;
 
+    const selectedStatus = document.getElementById('requestStatusFilter')?.value || 'ALL';
+
     try {
         const response = await fetch(REQUESTS_API_URL, {
             headers: getAdminAuthHeaders()
         });
 
         const result = await response.json();
-        const requests = result.data || (Array.isArray(result) ? result : []);
+        let requests = result.data || (Array.isArray(result) ? result : []);
+
+        // Task 8: Filtering Requests by Status dynamically
+        if (selectedStatus !== 'ALL') {
+            requests = requests.filter(req => req.status === selectedStatus);
+        }
 
         if (requests.length === 0) {
-            container.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">No customer requests submitted yet.</p>';
+            container.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">No requests found matching this filter.</p>';
             return;
         }
 
@@ -242,7 +282,7 @@ async function loadAdminRequests() {
 }
 
 /**
- * Updates status of a specific customer request (PUT /api/admin/requests/:id/status)
+ * Updates status of a specific customer request
  */
 async function updateAdminRequestStatus(requestId, newStatus) {
     try {
@@ -256,7 +296,7 @@ async function updateAdminRequestStatus(requestId, newStatus) {
 
         if (response.ok && result.success) {
             alert('Request status updated successfully!');
-            loadAdminRequests(); // Refresh list to confirm state
+            loadAdminRequests();
         } else {
             alert('Failed to update status: ' + (result.message || 'Unknown error'));
         }
@@ -278,4 +318,13 @@ function escapeHTML(str) {
 function escapeQuotes(str) {
     if (!str) return '';
     return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// Debounce Utility Function to minimize unnecessary API requests during continuous typing
+function debounce(func, delay = 300) {
+    let timeout;
+    return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), delay);
+    };
 }

@@ -86,7 +86,7 @@ const inquirySchema = new mongoose.Schema({
 });
 const Inquiry = mongoose.model('Inquiry', inquirySchema);
 
-// Service Schema (Task 3 & Task 6)
+// Service Schema (Task 3 & Task 6 & Task 8)
 const serviceSchema = new mongoose.Schema({
     title: { type: String, required: true },
     description: { type: String, required: true },
@@ -94,7 +94,7 @@ const serviceSchema = new mongoose.Schema({
 });
 const Service = mongoose.model('Service', serviceSchema);
 
-// Customer Request Schema (Task 7 - Scalable Structure)
+// Customer Request Schema (Task 7)
 const requestSchema = new mongoose.Schema({
     userId: { 
         type: mongoose.Schema.Types.ObjectId, 
@@ -126,9 +126,6 @@ const Request = mongoose.model('Request', requestSchema);
 // ==========================================
 // AUTOMATIC ADMIN ACCOUNT SEEDER
 // ==========================================
-/**
- * Ensures designated Admin email (emostafamamdoh@gmail.com) exists with Admin role.
- */
 async function autoSeedAdmin() {
     try {
         const adminEmail = 'emostafamamdoh@gmail.com';
@@ -138,10 +135,10 @@ async function autoSeedAdmin() {
             await User.create({
                 name: 'System Admin',
                 email: adminEmail,
-                password: 'admin123', // Default Password
+                password: 'admin123',
                 role: 'admin'
             });
-            console.log(`==> Admin Account Created Successfully: ${adminEmail} | Password: admin123`);
+            console.log(`==> Admin Account Created Successfully: ${adminEmail}`);
         } else if (adminUser.role !== 'admin') {
             adminUser.role = 'admin';
             await adminUser.save();
@@ -176,7 +173,6 @@ app.post('/api/register', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email address already registered.' });
         }
 
-        // Strictly assign 'admin' role ONLY to the designated admin email address
         let assignedRole = (normalizedEmail === 'emostafamamdoh@gmail.com' || role === 'admin') ? 'admin' : 'user';
 
         const newUser = new User({
@@ -209,7 +205,6 @@ app.post('/api/login', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid email or password.' });
         }
 
-        // Force Admin role enforcement for primary Admin email
         if (normalizedEmail === 'emostafamamdoh@gmail.com' && user.role !== 'admin') {
             user.role = 'admin';
             await user.save();
@@ -238,7 +233,7 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// Password Reset Route (For forgotten Admin or User password)
+// Password Reset Route
 app.post('/api/reset-password', async (req, res) => {
     try {
         const { email, newPassword } = req.body;
@@ -360,13 +355,35 @@ app.get('/api/inquiries', authenticateToken, requireAdmin, async (req, res) => {
 });
 
 // ==========================================
-// TASK 3 & 6: SERVICE MANAGEMENT ROUTES (CMS)
+// TASK 3, 6 & 8: SERVICE MANAGEMENT & SEARCH/FILTERING ROUTES
 // ==========================================
 
-// Fetch Public Services for Company Website Landing Page (Task 1 & 6)
+// Fetch Public Services with Backend Search & Dynamic Filtering (Task 8)
 app.get('/api/services', async (req, res) => {
     try {
-        const services = await Service.find().sort({ createdAt: -1 });
+        const { search, sortBy } = req.query;
+        let queryFilter = {};
+
+        // Task 8: Backend Dynamic Search Criteria
+        if (search && search.trim() !== '') {
+            const searchRegex = new RegExp(search.trim(), 'i');
+            queryFilter.$or = [
+                { title: searchRegex },
+                { description: searchRegex }
+            ];
+        }
+
+        // Task 8: Sorting Criteria Option
+        let sortOption = { createdAt: -1 }; // Default: Newest first
+        if (sortBy === 'title_asc') {
+            sortOption = { title: 1 };
+        } else if (sortBy === 'title_desc') {
+            sortOption = { title: -1 };
+        } else if (sortBy === 'oldest') {
+            sortOption = { createdAt: 1 };
+        }
+
+        const services = await Service.find(queryFilter).sort(sortOption);
         return res.json({ success: true, data: services });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });

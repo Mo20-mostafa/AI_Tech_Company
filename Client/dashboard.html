@@ -18,6 +18,10 @@
         .form-control:focus { border-color: #D97757; }
         textarea.form-control { resize: vertical; min-height: 100px; }
         
+        /* Task 8 UI: Search & Filter Controls */
+        .filter-bar { display: flex; gap: 0.75rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+        .filter-bar input, .filter-bar select { flex: 1; min-width: 140px; }
+
         .btn { padding: 0.75rem 1.5rem; background: #D97757; color: #FFFFFF; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
         .btn:hover { background: #C56547; }
         .btn-logout { background: #E5E7EB; color: #374151; }
@@ -39,7 +43,10 @@
 
     <div class="header">
         <h2>Customer Dashboard</h2>
-        <button class="btn btn-logout" onclick="logout()">Logout</button>
+        <div>
+            <a href="index.html" style="color:#D97757; margin-right: 1.5rem; text-decoration: none; font-weight: 600;">Back to Home</a>
+            <button class="btn btn-logout" onclick="logout()">Logout</button>
+        </div>
     </div>
 
     <!-- Section 1: User Profile -->
@@ -80,9 +87,22 @@
         </form>
     </div>
 
-    <!-- Section 3: Task 7 - Track Submitted Requests -->
+    <!-- Section 3: Task 7 & 8 - Track Submitted Requests with Search & Filter -->
     <div class="dash-card">
-        <h3 style="margin-bottom: 1.5rem; color: #111827; font-size: 1.25rem;">My Submitted Requests</h3>
+        <h3 style="margin-bottom: 1.25rem; color: #111827; font-size: 1.25rem;">My Submitted Requests</h3>
+        
+        <!-- Task 8: Search & Status Filter for User Requests -->
+        <div class="filter-bar">
+            <input type="text" id="userRequestSearch" class="form-control" placeholder="🔍 Search requests by title or description...">
+            <select id="userRequestStatusFilter" class="form-control">
+                <option value="All">All Statuses</option>
+                <option value="Pending">Pending</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+                <option value="Rejected">Rejected</option>
+            </select>
+        </div>
+
         <div id="userRequestsList">
             <p style="text-align: center; color: #6B7280;">Loading requests...</p>
         </div>
@@ -187,19 +207,34 @@
             }
         });
 
-        // 4. Task 7: Load Submitted Requests
+        // 4. Task 7 & 8: Load Submitted Requests with Search & Filter
         async function loadUserRequests() {
             const listContainer = document.getElementById('userRequestsList');
+            const searchVal = document.getElementById('userRequestSearch')?.value.toLowerCase().trim() || '';
+            const statusFilter = document.getElementById('userRequestStatusFilter')?.value || 'All';
 
             try {
                 const res = await fetch(`${API_URL}/user/requests`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const result = await res.json();
-                const requests = result.data || (Array.isArray(result) ? result : []);
+                let requests = result.data || (Array.isArray(result) ? result : []);
+
+                // Apply Status Filter
+                if (statusFilter !== 'All') {
+                    requests = requests.filter(req => req.status === statusFilter);
+                }
+
+                // Apply Text Search (Title or Description)
+                if (searchVal) {
+                    requests = requests.filter(req => 
+                        req.title.toLowerCase().includes(searchVal) || 
+                        req.description.toLowerCase().includes(searchVal)
+                    );
+                }
 
                 if (requests.length === 0) {
-                    listContainer.innerHTML = '<p style="text-align: center; color: #6B7280;">No requests submitted yet.</p>';
+                    listContainer.innerHTML = '<p style="text-align: center; color: #6B7280; padding: 1rem 0;">No matching requests found.</p>';
                     return;
                 }
 
@@ -216,7 +251,7 @@
                                 <span class="badge ${badgeClass}">${escapeHTML(req.status)}</span>
                             </div>
                             <p style="color: #4B5563; font-size: 0.95rem; margin-bottom: 0.5rem; line-height: 1.4;">${escapeHTML(req.description)}</p>
-                            <small style="color: #9CA3AF;">Date: ${new Date(req.createdAt || Date.now()).toLocaleDateString()}</small>
+                            <small style="color: #9CA3AF;">Submitted: ${new Date(req.createdAt || Date.now()).toLocaleDateString()}</small>
                         </div>
                     `;
                 }).join('');
@@ -225,6 +260,22 @@
                 listContainer.innerHTML = '<p style="text-align: center; color: #EF4444;">Failed to load requests.</p>';
             }
         }
+
+        // Setup Search & Filter Listeners with Debounce
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchInput = document.getElementById('userRequestSearch');
+            const statusSelect = document.getElementById('userRequestStatusFilter');
+
+            if (searchInput) {
+                searchInput.addEventListener('input', debounce(() => loadUserRequests(), 300));
+            }
+            if (statusSelect) {
+                statusSelect.addEventListener('change', () => loadUserRequests());
+            }
+
+            loadProfile();
+            loadUserRequests();
+        });
 
         function logout() {
             localStorage.clear();
@@ -236,9 +287,13 @@
             return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
         }
 
-        // Initialize Page Data
-        loadProfile();
-        loadUserRequests();
+        function debounce(func, delay = 300) {
+            let timeout;
+            return (...args) => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), delay);
+            };
+        }
     </script>
 </body>
 </html>

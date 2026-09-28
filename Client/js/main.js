@@ -1,12 +1,28 @@
 /* ==========================================
    NEXUS AI - Main Client Application Logic
-   Handles dynamic service rendering, demo simulation,
-   and public contact form submissions.
+   Handles dynamic service rendering, search/filtering,
+   demo simulation, and public contact form submissions.
    ========================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Fetch and render public company services dynamically on initial load
     fetchServices();
+
+    // 2. Task 8: Real-time Search & Sorting Event Listeners for Public Visitors
+    const searchInput = document.getElementById('publicSearchInput') || document.getElementById('searchInput');
+    const sortSelect = document.getElementById('publicSortSelect') || document.getElementById('sortSelect');
+
+    if (searchInput) {
+        searchInput.addEventListener('input', debounce(() => {
+            fetchServices();
+        }, 300));
+    }
+
+    if (sortSelect) {
+        sortSelect.addEventListener('change', () => {
+            fetchServices();
+        });
+    }
 
     // ==========================================
     // INTERACTIVE MODEL DEMO FEATURE
@@ -100,18 +116,24 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==========================================
-// DYNAMIC PUBLIC SERVICES FETCHING (TASK 6)
+// DYNAMIC PUBLIC SERVICES FETCHING & BACKEND SEARCH/FILTERING (TASK 8)
 // ==========================================
 /**
- * Fetches company services dynamically from the public API endpoint.
- * Adheres strictly to Admin RBAC rules (Read-only for public visitors).
+ * Fetches company services dynamically from the backend API with optional search and sort queries.
  */
 async function fetchServices() {
     try {
-        const response = await fetch('http://localhost:5000/api/services');
+        const searchVal = (document.getElementById('publicSearchInput') || document.getElementById('searchInput'))?.value || '';
+        const sortVal = (document.getElementById('publicSortSelect') || document.getElementById('sortSelect'))?.value || 'newest';
+
+        const queryParams = new URLSearchParams({
+            search: searchVal,
+            sortBy: sortVal
+        });
+
+        const response = await fetch(`http://localhost:5000/api/services?${queryParams.toString()}`);
         const result = await response.json();
         
-        // Extract services array safely from backend API response schema
         const servicesList = result.data || (Array.isArray(result) ? result : []);
 
         const container = document.getElementById('servicesContainer') 
@@ -120,11 +142,10 @@ async function fetchServices() {
 
         if (container) {
             if (servicesList.length === 0) {
-                container.innerHTML = '<p style="text-align: center; grid-column: 1/-1; color: #666;">No services available at the moment.</p>';
+                container.innerHTML = '<p style="text-align: center; grid-column: 1/-1; color: #666;">No services match your search terms.</p>';
                 return;
             }
 
-            // Render live public services dynamically inside cards
             container.innerHTML = servicesList.map(service => `
                 <div class="service-card card">
                     <h3>${escapeHTML(service.title)}</h3>
@@ -151,4 +172,13 @@ function escapeHTML(str) {
             '"': '&quot;'
         }[tag] || tag)
     );
+}
+
+// Utility Function for Performance Debouncing
+function debounce(func, delay = 300) {
+    let timeout;
+    return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), delay);
+    };
 }
