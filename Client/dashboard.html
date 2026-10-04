@@ -37,6 +37,46 @@
         .request-item { padding: 1.25rem; border: 1px solid #E5E7EB; border-radius: 8px; margin-bottom: 1rem; background-color: #FAFAFA; }
         .request-item:last-child { margin-bottom: 0; }
         .request-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+
+        /* Task 10 — File Upload UI */
+        .upload-row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+        .upload-row input[type="file"] {
+            flex: 1; min-width: 200px;
+            padding: 0.5rem;
+            border: 1px dashed #D1D5DB;
+            border-radius: 8px;
+            background: #FAFAFA;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+        .upload-row input[type="file"]:hover { border-color: #D97757; }
+        .file-item {
+            padding: 1rem;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+            background-color: #FAFAFA;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .file-item .meta { flex: 1; min-width: 180px; }
+        .file-item .meta h4 { font-size: 0.95rem; color: #111827; margin-bottom: 4px; word-break: break-all; }
+        .file-item .meta p { font-size: 0.8rem; color: #6B7280; }
+        .file-item .actions { display: flex; gap: 0.5rem; }
+        .file-item a.view-link {
+            color: #D97757; font-weight: 600; text-decoration: none; font-size: 0.85rem;
+            padding: 6px 12px; border: 1px solid #D1D5DB; border-radius: 6px;
+        }
+        .file-item a.view-link:hover { background: #F3F4F6; }
+        .file-item button.delete-file {
+            color: #c06345; background: transparent; border: 1px solid #c06345;
+            padding: 6px 12px; border-radius: 6px; cursor: pointer;
+            font-weight: 600; font-size: 0.85rem;
+        }
+        .file-item button.delete-file:hover { background: #FEE2E2; }
     </style>
 </head>
 <body>
@@ -45,28 +85,27 @@
         <h2>Customer Dashboard</h2>
         <div>
             <a href="index.html" style="color:#D97757; margin-right: 1.5rem; text-decoration: none; font-weight: 600;">Back to Home</a>
-            <button class="btn btn-logout" onclick="logout()">Logout</button>
+            <button class="btn btn-logout" id="logoutBtn">Logout</button>
         </div>
     </div>
 
-    <!-- Section 1: User Profile -->
+    <!-- Section 1: User Profile (Task 5) -->
     <div class="dash-card">
         <h3 style="margin-bottom: 1.5rem; color: #111827; font-size: 1.25rem;">Your Profile Details</h3>
         <form id="profileForm">
             <div class="form-group">
-                <label for="p-name">Full Name</label>
-                <input type="text" id="p-name" class="form-control" required>
+                <label for="profileName">Full Name</label>
+                <input type="text" id="profileName" name="name" class="form-control" required>
             </div>
             <div class="form-group">
-                <label for="p-email">Email Address</label>
-                <input type="email" id="p-email" class="form-control" required>
+                <label for="profileEmail">Email Address</label>
+                <input type="email" id="profileEmail" name="email" class="form-control" required>
             </div>
             <div class="form-group">
-                <label for="p-pass">New Password (Leave blank to keep current)</label>
-                <input type="password" id="p-pass" class="form-control" placeholder="••••••••">
+                <label for="profilePassword">New Password (Leave blank to keep current)</label>
+                <input type="password" id="profilePassword" name="password" class="form-control" placeholder="••••••••">
             </div>
             <button type="submit" class="btn">Update Profile</button>
-            <span id="p-msg" style="margin-left: 1rem; font-weight: 600; font-size: 0.9rem;"></span>
         </form>
     </div>
 
@@ -76,22 +115,21 @@
         <form id="createRequestForm">
             <div class="form-group">
                 <label for="reqTitle">Request Title / Topic</label>
-                <input type="text" id="reqTitle" class="form-control" placeholder="e.g., AI Model Customization Request" required>
+                <input type="text" id="reqTitle" name="title" class="form-control" placeholder="e.g., AI Model Customization Request" required>
             </div>
             <div class="form-group">
                 <label for="reqDescription">Detailed Description</label>
-                <textarea id="reqDescription" class="form-control" placeholder="Describe what you need in detail..." required></textarea>
+                <textarea id="reqDescription" name="description" class="form-control" placeholder="Describe what you need in detail..." required></textarea>
             </div>
             <button type="submit" class="btn">Submit Request</button>
-            <span id="req-msg" style="margin-left: 1rem; font-weight: 600; font-size: 0.9rem;"></span>
         </form>
     </div>
 
-    <!-- Section 3: Task 7 & 8 - Track Submitted Requests with Search & Filter -->
+    <!-- Section 3: Task 7 & 8 - Track Submitted Requests -->
     <div class="dash-card">
         <h3 style="margin-bottom: 1.25rem; color: #111827; font-size: 1.25rem;">My Submitted Requests</h3>
         
-        <!-- Task 8: Search & Status Filter for User Requests -->
+        <!-- Task 8: Client-side quick filter (the backend already returns all user's requests) -->
         <div class="filter-bar">
             <input type="text" id="userRequestSearch" class="form-control" placeholder="🔍 Search requests by title or description...">
             <select id="userRequestStatusFilter" class="form-control">
@@ -108,183 +146,93 @@
         </div>
     </div>
 
+    <!-- Section 4: TASK 10 — My Files (upload, list, delete) -->
+    <div class="dash-card">
+        <h3 style="margin-bottom: 1.5rem; color: #111827; font-size: 1.25rem;">My Files</h3>
+        <p style="color:#6B7280; font-size:0.85rem; margin-bottom:1rem;">
+            Upload images or documents (PDF, DOC, XLS, PPT, TXT) up to 10 MB.
+        </p>
+
+        <!-- Upload form -->
+        <form id="fileUploadForm" enctype="multipart/form-data">
+            <div class="upload-row">
+                <input type="file" id="fileInput" name="file"
+                       accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" required>
+                <button type="submit" class="btn" id="uploadFileBtn">Upload File</button>
+            </div>
+            <div id="fileUploadMsg" style="font-weight:600; font-size:0.9rem; margin-bottom:1rem;"></div>
+        </form>
+
+        <!-- Files list -->
+        <div id="userFilesList">
+            <p style="text-align: center; color: #6B7280;">Loading files...</p>
+        </div>
+    </div>
+
+    <!-- External dashboard logic (RBAC-aware) -->
+    <!-- NOTE: auth.js is for login.html only — dashboard.js is self-contained -->
+    <script src="js/dashboard.js"></script>
+
+    <!-- Inline: light client-side filtering for the requests list -->
     <script>
-        const API_URL = 'http://localhost:5000/api';
-        const token = localStorage.getItem('token');
-
-        if (!token) {
-            window.location.href = 'login.html';
-        }
-
-        // 1. Fetch Profile Info
-        async function loadProfile() {
-            try {
-                const res = await fetch(`${API_URL}/user/profile`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await res.json();
-
-                if (res.ok && data.success) {
-                    document.getElementById('p-name').value = data.user.name;
-                    document.getElementById('p-email').value = data.user.email;
-                } else {
-                    logout();
-                }
-            } catch (err) {
-                console.error('Profile fetch error:', err);
-            }
-        }
-
-        // 2. Update Profile Form
-        document.getElementById('profileForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const msg = document.getElementById('p-msg');
-            msg.textContent = '';
-
-            const payload = {
-                name: document.getElementById('p-name').value,
-                email: document.getElementById('p-email').value,
-                password: document.getElementById('p-pass').value
-            };
-
-            try {
-                const res = await fetch(`${API_URL}/user/profile`, {
-                    method: 'PUT',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}` 
-                    },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-
-                if (res.ok && data.success) {
-                    msg.style.color = '#10B981';
-                    msg.textContent = data.message || 'Profile updated!';
-                } else {
-                    msg.style.color = '#EF4444';
-                    msg.textContent = data.message || 'Update failed.';
-                }
-            } catch (err) {
-                msg.style.color = '#EF4444';
-                msg.textContent = 'Error updating profile.';
-            }
-        });
-
-        // 3. Task 7: Submit New Request Handler
-        document.getElementById('createRequestForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const msg = document.getElementById('req-msg');
-            msg.textContent = '';
-
-            const title = document.getElementById('reqTitle').value.trim();
-            const description = document.getElementById('reqDescription').value.trim();
-
-            try {
-                const res = await fetch(`${API_URL}/requests`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ title, description })
-                });
-
-                const data = await res.json();
-
-                if (res.ok && data.success) {
-                    msg.style.color = '#10B981';
-                    msg.textContent = 'Request submitted successfully!';
-                    document.getElementById('createRequestForm').reset();
-                    loadUserRequests(); // Reload list
-                } else {
-                    msg.style.color = '#EF4444';
-                    msg.textContent = data.message || 'Submission failed.';
-                }
-            } catch (err) {
-                msg.style.color = '#EF4444';
-                msg.textContent = 'Server error during submission.';
-            }
-        });
-
-        // 4. Task 7 & 8: Load Submitted Requests with Search & Filter
-        async function loadUserRequests() {
-            const listContainer = document.getElementById('userRequestsList');
-            const searchVal = document.getElementById('userRequestSearch')?.value.toLowerCase().trim() || '';
-            const statusFilter = document.getElementById('userRequestStatusFilter')?.value || 'All';
-
-            try {
-                const res = await fetch(`${API_URL}/user/requests`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const result = await res.json();
-                let requests = result.data || (Array.isArray(result) ? result : []);
-
-                // Apply Status Filter
-                if (statusFilter !== 'All') {
-                    requests = requests.filter(req => req.status === statusFilter);
-                }
-
-                // Apply Text Search (Title or Description)
-                if (searchVal) {
-                    requests = requests.filter(req => 
-                        req.title.toLowerCase().includes(searchVal) || 
-                        req.description.toLowerCase().includes(searchVal)
-                    );
-                }
-
-                if (requests.length === 0) {
-                    listContainer.innerHTML = '<p style="text-align: center; color: #6B7280; padding: 1rem 0;">No matching requests found.</p>';
-                    return;
-                }
-
-                listContainer.innerHTML = requests.map(req => {
-                    let badgeClass = 'badge-pending';
-                    if (req.status === 'In Progress') badgeClass = 'badge-progress';
-                    if (req.status === 'Completed') badgeClass = 'badge-completed';
-                    if (req.status === 'Rejected') badgeClass = 'badge-rejected';
-
-                    return `
-                        <div class="request-item">
-                            <div class="request-header">
-                                <h4 style="font-size: 1.05rem; color: #111827;">${escapeHTML(req.title)}</h4>
-                                <span class="badge ${badgeClass}">${escapeHTML(req.status)}</span>
-                            </div>
-                            <p style="color: #4B5563; font-size: 0.95rem; margin-bottom: 0.5rem; line-height: 1.4;">${escapeHTML(req.description)}</p>
-                            <small style="color: #9CA3AF;">Submitted: ${new Date(req.createdAt || Date.now()).toLocaleDateString()}</small>
-                        </div>
-                    `;
-                }).join('');
-            } catch (err) {
-                console.error('Requests load error:', err);
-                listContainer.innerHTML = '<p style="text-align: center; color: #EF4444;">Failed to load requests.</p>';
-            }
-        }
-
-        // Setup Search & Filter Listeners with Debounce
         document.addEventListener('DOMContentLoaded', () => {
             const searchInput = document.getElementById('userRequestSearch');
             const statusSelect = document.getElementById('userRequestStatusFilter');
 
+            // Re-render list from cached data whenever search/filter changes
             if (searchInput) {
-                searchInput.addEventListener('input', debounce(() => loadUserRequests(), 300));
+                searchInput.addEventListener('input', debounce(applyClientFilters, 250));
             }
             if (statusSelect) {
-                statusSelect.addEventListener('change', () => loadUserRequests());
+                statusSelect.addEventListener('change', applyClientFilters);
             }
-
-            loadProfile();
-            loadUserRequests();
         });
 
-        function logout() {
-            localStorage.clear();
-            window.location.href = 'login.html';
+        // Cache of the last fetched requests so filtering is instant
+        window.__cachedRequests = window.__cachedRequests || [];
+
+        function applyClientFilters() {
+            const container = document.getElementById('userRequestsList');
+            if (!container) return;
+
+            const searchVal = (document.getElementById('userRequestSearch')?.value || '').toLowerCase().trim();
+            const statusVal = document.getElementById('userRequestStatusFilter')?.value || 'All';
+
+            let list = window.__cachedRequests.slice();
+
+            if (statusVal !== 'All') list = list.filter(r => r.status === statusVal);
+            if (searchVal) list = list.filter(r =>
+                (r.title || '').toLowerCase().includes(searchVal) ||
+                (r.description || '').toLowerCase().includes(searchVal)
+            );
+
+            if (list.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #6B7280; padding: 1rem 0;">No matching requests found.</p>';
+                return;
+            }
+
+            container.innerHTML = list.map(req => {
+                let badgeClass = 'badge-pending';
+                if (req.status === 'In Progress') badgeClass = 'badge-progress';
+                if (req.status === 'Completed') badgeClass = 'badge-completed';
+                if (req.status === 'Rejected') badgeClass = 'badge-rejected';
+
+                return `
+                    <div class="request-item">
+                        <div class="request-header">
+                            <h4 style="font-size: 1.05rem; color: #111827;">${escapeHTML(req.title)}</h4>
+                            <span class="badge ${badgeClass}">${escapeHTML(req.status)}</span>
+                        </div>
+                        <p style="color: #4B5563; font-size: 0.95rem; margin-bottom: 0.5rem; line-height: 1.4;">${escapeHTML(req.description)}</p>
+                        <small style="color: #9CA3AF;">Submitted: ${new Date(req.createdAt || Date.now()).toLocaleDateString()}</small>
+                    </div>
+                `;
+            }).join('');
         }
 
         function escapeHTML(str) {
             if (!str) return '';
-            return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+            return String(str).replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
         }
 
         function debounce(func, delay = 300) {

@@ -1,34 +1,31 @@
-// Base API endpoint configuration
+// ==========================================
+// NEXUS AI - Authentication Logic
+// Tasks 4 (Auth), 5 (Profile), 9 (RBAC)
+// ==========================================
+
 const API_URL = 'http://localhost:5000/api';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Attach listener for Login Form submission
     const loginForm = document.getElementById('loginForm') || document.getElementById('login-form');
-    if (loginForm) {
-        loginForm.addEventListener('submit', handleLogin);
-    }
+    if (loginForm) loginForm.addEventListener('submit', handleLogin);
 
-    // 2. Attach listener for Registration Form submission
     const registerForm = document.getElementById('registerForm') || document.getElementById('register-form');
-    if (registerForm) {
-        registerForm.addEventListener('submit', handleRegister);
-    }
+    if (registerForm) registerForm.addEventListener('submit', handleRegister);
 
-    // 3. Attach listener for Logout action button
     const logoutBtn = document.getElementById('logoutBtn') || document.getElementById('logout-btn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', handleLogout);
-    }
+    if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
 });
 
-/**
- * Handles user authentication/login request and stores access token.
- */
+// ==========================================
+// LOGIN
+// ==========================================
+
 async function handleLogin(e) {
     e.preventDefault();
 
-    const emailInput = document.getElementById('email');
-    const passwordInput = document.getElementById('password');
+    // Support new IDs (emailLogin/passwordLogin) + old IDs (email/password)
+    const emailInput = document.getElementById('emailLogin') || document.getElementById('email');
+    const passwordInput = document.getElementById('passwordLogin') || document.getElementById('password');
     const errorContainer = document.getElementById('auth-error') || document.getElementById('loginError');
 
     const email = emailInput?.value.trim();
@@ -48,14 +45,19 @@ async function handleLogin(e) {
 
         const data = await response.json();
 
-        if (response.ok && data.token) {
-            // Save authentication details in LocalStorage
+        if (response.ok && data.token && data.user) {
             localStorage.setItem('token', data.token);
-            localStorage.setItem('userRole', data.role || 'user');
-            if (data.username) localStorage.setItem('username', data.username);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('permissions', JSON.stringify(data.user.permissions || []));
+            localStorage.setItem('userRole', data.user.role || 'customer');
+            localStorage.setItem('username', data.user.name || '');
 
-            // Redirect based on user permissions role
-            if (data.role === 'admin') {
+            const role = data.user.role;
+            const perms = data.user.permissions || [];
+
+            if (role === 'admin') {
+                window.location.href = 'admin.html';
+            } else if (role === 'employee' || perms.includes('requests:read_all') || perms.includes('inquiries:read')) {
                 window.location.href = 'admin.html';
             } else {
                 window.location.href = 'dashboard.html';
@@ -69,22 +71,30 @@ async function handleLogin(e) {
     }
 }
 
-/**
- * Handles new account registration request.
- */
+// ==========================================
+// REGISTER
+// ==========================================
+
 async function handleRegister(e) {
     e.preventDefault();
 
-    const usernameInput = document.getElementById('username') || document.getElementById('name');
-    const emailInput = document.getElementById('email');
-    const passwordInput = document.getElementById('password');
+    // Support new IDs + old IDs + legacy
+    const nameInput = document.getElementById('nameRegister')
+        || document.getElementById('name')
+        || document.getElementById('username');
+    const emailInput = document.getElementById('emailRegister')
+        || document.getElementById('email-reg')
+        || document.getElementById('email');
+    const passwordInput = document.getElementById('passwordRegister')
+        || document.getElementById('password-reg')
+        || document.getElementById('password');
     const errorContainer = document.getElementById('auth-error') || document.getElementById('registerError');
 
-    const username = usernameInput?.value.trim();
+    const name = nameInput?.value.trim();
     const email = emailInput?.value.trim();
     const password = passwordInput?.value;
 
-    if (!username || !email || !password) {
+    if (!name || !email || !password) {
         showAuthError(errorContainer, 'Please provide name, email, and password.');
         return;
     }
@@ -93,7 +103,7 @@ async function handleRegister(e) {
         const response = await fetch(`${API_URL}/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, email, password })
+            body: JSON.stringify({ name, email, password })
         });
 
         const data = await response.json();
@@ -110,19 +120,19 @@ async function handleRegister(e) {
     }
 }
 
-/**
- * Clears active token and logs user out.
- */
+// ==========================================
+// LOGOUT
+// ==========================================
+
 function handleLogout() {
-    localStorage.removeItem('token');
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('username');
+    ['token', 'user', 'permissions', 'userRole', 'username'].forEach(k => localStorage.removeItem(k));
     window.location.href = 'login.html';
 }
 
-/**
- * Displays error status message on UI.
- */
+// ==========================================
+// ERROR DISPLAY
+// ==========================================
+
 function showAuthError(element, message) {
     if (element) {
         element.style.color = 'red';

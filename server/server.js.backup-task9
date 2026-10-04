@@ -4,10 +4,6 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const crypto = require('crypto');
 
 const app = express();
 
@@ -19,59 +15,6 @@ app.use(express.json());
 
 // Email validation regex
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// ==========================================
-// TASK 10: FILE UPLOAD SETUP
-// ==========================================
-
-// Ensure uploads directory exists
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
-if (!fs.existsSync(UPLOADS_DIR)) {
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-    console.log('==> uploads/ directory created');
-}
-
-// Allowed file types for safe upload (images + documents only)
-const ALLOWED_MIME_TYPES = [
-    // Images
-    'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp',
-    // Documents
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/vnd.ms-powerpoint',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'text/plain'
-];
-
-// Max file size: 10MB
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
-
-// Multer storage — save with a unique random filename (keeps original name in DB)
-const fileStorage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, UPLOADS_DIR),
-    filename: (req, file, cb) => {
-        const uniqueName = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${path.extname(file.originalname)}`;
-        cb(null, uniqueName);
-    }
-});
-
-// File filter — reject anything not in the allow-list
-const fileFilter = (req, file, cb) => {
-    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-        return cb(null, true);
-    }
-    cb(new Error('File type not allowed. Please upload an image or document (pdf, doc, docx, xls, xlsx, ppt, pptx, txt).'));
-};
-
-// Configure multer with limits + filter
-const upload = multer({
-    storage: fileStorage,
-    limits: { fileSize: MAX_FILE_SIZE },
-    fileFilter
-});
 
 // ==========================================
 // CENTRAL PERMISSIONS REGISTRY (Task 9 - RBAC)
@@ -93,10 +36,7 @@ const PERMISSIONS = {
     ROLES_READ: 'roles:read',
     ROLES_CREATE: 'roles:create',
     ROLES_UPDATE: 'roles:update',
-    ROLES_DELETE: 'roles:delete',
-    // Task 10 — file management
-    FILES_READ_ALL: 'files:read_all',
-    FILES_DELETE_ANY: 'files:delete_any'
+    ROLES_DELETE: 'roles:delete'
 };
 
 // Default roles seeded on boot (source of truth)
@@ -114,8 +54,7 @@ const DEFAULT_ROLES = {
             PERMISSIONS.INQUIRIES_READ,
             PERMISSIONS.REQUESTS_READ_ALL,
             PERMISSIONS.REQUESTS_UPDATE_STATUS,
-            PERMISSIONS.USERS_READ,
-            PERMISSIONS.FILES_READ_ALL
+            PERMISSIONS.USERS_READ
         ]
     },
     customer: {
@@ -159,12 +98,13 @@ const roleSchema = new mongoose.Schema({
 const Role = mongoose.model('Role', roleSchema);
 
 // User Model (Task 4, 5, 9)
+// `role` kept as String for backward-compatibility with existing data.
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true },
     role: { type: String, default: 'customer' },
-    permissions: { type: [String], default: [] },
+    permissions: { type: [String], default: [] }, // cached permissions for fast checks
     isActive: { type: Boolean, default: true },
     createdAt: { type: Date, default: Date.now }
 });
@@ -202,18 +142,6 @@ const requestSchema = new mongoose.Schema({
 });
 const Request = mongoose.model('Request', requestSchema);
 
-// File Model (Task 10) — metadata only, actual file on disk
-const fileSchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    originalName: { type: String, required: true }, // e.g. "contract.pdf"
-    storedName: { type: String, required: true },   // e.g. "1712345-abc123.pdf"
-    mimeType: { type: String, required: true },
-    size: { type: Number, required: true },         // in bytes
-    path: { type: String, required: true },         // full path on disk
-    uploadedAt: { type: Date, default: Date.now }
-});
-const File = mongoose.model('File', fileSchema);
-
 // ==========================================
 // HELPERS
 // ==========================================
@@ -227,19 +155,11 @@ const hashPassword = async (plain) => bcrypt.hash(plain, 10);
 // Compare plain vs hash
 const comparePassword = async (plain, hashed) => bcrypt.compare(plain, hashed);
 
-// Format bytes to human-readable (e.g. 1.5 MB)
-const formatBytes = (bytes) => {
-    if (!bytes) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-};
-
 // ==========================================
 // AUTH MIDDLEWARES
 // ==========================================
 
+// Verify JWT and attach fresh user (with permissions) to req.user
 const authenticateToken = async (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -266,15 +186,21 @@ const authenticateToken = async (req, res, next) => {
     }
 };
 
+// Backward-compat admin-only middleware (kept for any legacy use)
 const requireAdmin = (req, res, next) => {
     if (req.user && req.user.role === 'admin') return next();
     return res.status(403).json({ success: false, message: 'Access denied. Admin credentials required.' });
 };
 
+// Permission-based authorization middleware (Task 9)
+// Usage: authorize(PERMISSIONS.SERVICES_CREATE) OR authorize([...])
 const authorize = (required) => (req, res, next) => {
     const needed = Array.isArray(required) ? required : [required];
     const userPerms = (req.user && req.user.permissions) || [];
+
+    // Admin always passes
     if (req.user && req.user.role === 'admin') return next();
+
     const ok = needed.every(p => userPerms.includes(p));
     if (!ok) {
         return res.status(403).json({ success: false, message: 'Access denied. Insufficient permissions.' });
@@ -286,6 +212,7 @@ const authorize = (required) => (req, res, next) => {
 // SEEDERS (idempotent)
 // ==========================================
 
+// Seed default roles and keep their permissions in sync with code
 async function seedRoles() {
     try {
         for (const [name, def] of Object.entries(DEFAULT_ROLES)) {
@@ -312,6 +239,7 @@ async function seedRoles() {
     }
 }
 
+// Ensure designated admin account exists with admin role & permissions
 async function seedAdminUser() {
     try {
         const adminEmail = 'emostafamamdoh@gmail.com';
@@ -349,13 +277,11 @@ app.get('/', (req, res) => {
     res.send('Nexus AI Integrated Backend Service is Running Smoothly.');
 });
 
-// Serve uploaded files statically
-app.use('/uploads', express.static(UPLOADS_DIR));
-
 // ==========================================
 // TASK 4 & 5: AUTH ROUTES
 // ==========================================
 
+// POST /api/register — create new user (default role: customer, unless designated admin email)
 app.post('/api/register', async (req, res) => {
     try {
         const { name, email, password } = req.body;
@@ -374,6 +300,7 @@ app.post('/api/register', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email address already registered.' });
         }
 
+        // Security: role never comes from client input
         const targetRole = normalizedEmail === 'emostafamamdoh@gmail.com' ? 'admin' : 'customer';
         const roleDoc = await Role.findOne({ name: targetRole });
         const permissions = roleDoc ? roleDoc.permissions : [];
@@ -392,6 +319,7 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
+// POST /api/login
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -406,6 +334,7 @@ app.post('/api/login', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid email or password.' });
         }
 
+        // Backward-compat: allow one-time plain→hash migration on successful login
         let valid = false;
         if (isHashed(user.password)) {
             valid = await comparePassword(password.trim(), user.password);
@@ -418,12 +347,14 @@ app.post('/api/login', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid email or password.' });
         }
 
+        // Auto-promote designated admin
         if (normalizedEmail === 'emostafamamdoh@gmail.com' && user.role !== 'admin') {
             const adminRole = await Role.findOne({ name: 'admin' });
             user.role = 'admin';
             user.permissions = adminRole ? adminRole.permissions : Object.values(PERMISSIONS);
         }
 
+        // Sync permissions from Role doc (source of truth)
         const roleDoc = await Role.findOne({ name: user.role });
         if (roleDoc && JSON.stringify(user.permissions) !== JSON.stringify(roleDoc.permissions)) {
             user.permissions = roleDoc.permissions;
@@ -452,6 +383,7 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+// POST /api/reset-password
 app.post('/api/reset-password', async (req, res) => {
     try {
         const { email, newPassword } = req.body;
@@ -473,6 +405,7 @@ app.post('/api/reset-password', async (req, res) => {
     }
 });
 
+// GET /api/user/profile
 app.get('/api/user/profile', authenticateToken, async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select('-password');
@@ -483,6 +416,7 @@ app.get('/api/user/profile', authenticateToken, async (req, res) => {
     }
 });
 
+// PUT /api/user/profile
 app.put('/api/user/profile', authenticateToken, async (req, res) => {
     try {
         const { name, email, password } = req.body;
@@ -516,6 +450,7 @@ app.put('/api/user/profile', authenticateToken, async (req, res) => {
 // TASK 2: CONTACT / INQUIRY ROUTES
 // ==========================================
 
+// POST /api/contact — public inquiry submission
 app.post('/api/contact', async (req, res) => {
     try {
         const { name, email, subject, message } = req.body;
@@ -540,6 +475,7 @@ app.post('/api/contact', async (req, res) => {
     }
 });
 
+// GET /api/inquiries — admin/employee can view
 app.get('/api/inquiries', authenticateToken, authorize(PERMISSIONS.INQUIRIES_READ), async (req, res) => {
     try {
         const inquiries = await Inquiry.find().sort({ createdAt: -1 });
@@ -553,6 +489,7 @@ app.get('/api/inquiries', authenticateToken, authorize(PERMISSIONS.INQUIRIES_REA
 // TASK 3, 6 & 8: SERVICES (CRUD + Search/Filter)
 // ==========================================
 
+// GET /api/services — public read with search & sort
 app.get('/api/services', async (req, res) => {
     try {
         const { search, sortBy } = req.query;
@@ -575,6 +512,7 @@ app.get('/api/services', async (req, res) => {
     }
 });
 
+// POST /api/services — admin or anyone with services:create
 app.post('/api/services', authenticateToken, authorize(PERMISSIONS.SERVICES_CREATE), async (req, res) => {
     try {
         const { title, description } = req.body;
@@ -588,6 +526,7 @@ app.post('/api/services', authenticateToken, authorize(PERMISSIONS.SERVICES_CREA
     }
 });
 
+// PUT /api/services/:id
 app.put('/api/services/:id', authenticateToken, authorize(PERMISSIONS.SERVICES_UPDATE), async (req, res) => {
     try {
         const { title, description } = req.body;
@@ -603,6 +542,7 @@ app.put('/api/services/:id', authenticateToken, authorize(PERMISSIONS.SERVICES_U
     }
 });
 
+// DELETE /api/services/:id
 app.delete('/api/services/:id', authenticateToken, authorize(PERMISSIONS.SERVICES_DELETE), async (req, res) => {
     try {
         const deleted = await Service.findByIdAndDelete(req.params.id);
@@ -617,6 +557,7 @@ app.delete('/api/services/:id', authenticateToken, authorize(PERMISSIONS.SERVICE
 // TASK 7: CUSTOMER REQUESTS
 // ==========================================
 
+// POST /api/requests — customer creates own request
 app.post('/api/requests', authenticateToken, authorize(PERMISSIONS.REQUESTS_CREATE_OWN), async (req, res) => {
     try {
         const { title, description } = req.body;
@@ -634,6 +575,7 @@ app.post('/api/requests', authenticateToken, authorize(PERMISSIONS.REQUESTS_CREA
     }
 });
 
+// GET /api/user/requests — own list
 app.get('/api/user/requests', authenticateToken, authorize(PERMISSIONS.REQUESTS_READ_OWN), async (req, res) => {
     try {
         const list = await Request.find({ userId: req.user.id }).sort({ createdAt: -1 });
@@ -643,6 +585,7 @@ app.get('/api/user/requests', authenticateToken, authorize(PERMISSIONS.REQUESTS_
     }
 });
 
+// GET /api/admin/requests — all requests
 app.get('/api/admin/requests', authenticateToken, authorize(PERMISSIONS.REQUESTS_READ_ALL), async (req, res) => {
     try {
         const list = await Request.find()
@@ -654,6 +597,7 @@ app.get('/api/admin/requests', authenticateToken, authorize(PERMISSIONS.REQUESTS
     }
 });
 
+// PUT /api/admin/requests/:id/status
 app.put('/api/admin/requests/:id/status', authenticateToken, authorize(PERMISSIONS.REQUESTS_UPDATE_STATUS), async (req, res) => {
     try {
         const { status } = req.body;
@@ -673,6 +617,7 @@ app.put('/api/admin/requests/:id/status', authenticateToken, authorize(PERMISSIO
 // TASK 9: ROLES & USERS MANAGEMENT
 // ==========================================
 
+// GET /api/roles — list all roles
 app.get('/api/roles', authenticateToken, authorize(PERMISSIONS.ROLES_READ), async (req, res) => {
     try {
         const roles = await Role.find().sort({ name: 1 });
@@ -682,6 +627,7 @@ app.get('/api/roles', authenticateToken, authorize(PERMISSIONS.ROLES_READ), asyn
     }
 });
 
+// POST /api/roles — create custom role
 app.post('/api/roles', authenticateToken, authorize(PERMISSIONS.ROLES_CREATE), async (req, res) => {
     try {
         const { name, displayName, description, permissions } = req.body;
@@ -704,6 +650,7 @@ app.post('/api/roles', authenticateToken, authorize(PERMISSIONS.ROLES_CREATE), a
     }
 });
 
+// PUT /api/roles/:id — update role
 app.put('/api/roles/:id', authenticateToken, authorize(PERMISSIONS.ROLES_UPDATE), async (req, res) => {
     try {
         const role = await Role.findById(req.params.id);
@@ -721,6 +668,7 @@ app.put('/api/roles/:id', authenticateToken, authorize(PERMISSIONS.ROLES_UPDATE)
     }
 });
 
+// DELETE /api/roles/:id — cannot delete system roles
 app.delete('/api/roles/:id', authenticateToken, authorize(PERMISSIONS.ROLES_DELETE), async (req, res) => {
     try {
         const role = await Role.findById(req.params.id);
@@ -734,6 +682,7 @@ app.delete('/api/roles/:id', authenticateToken, authorize(PERMISSIONS.ROLES_DELE
     }
 });
 
+// GET /api/users — list all users
 app.get('/api/users', authenticateToken, authorize(PERMISSIONS.USERS_READ), async (req, res) => {
     try {
         const users = await User.find().select('-password').sort({ createdAt: -1 });
@@ -743,6 +692,7 @@ app.get('/api/users', authenticateToken, authorize(PERMISSIONS.USERS_READ), asyn
     }
 });
 
+// PUT /api/users/:id/role — assign role to user
 app.put('/api/users/:id/role', authenticateToken, authorize(PERMISSIONS.USERS_ASSIGN_ROLE), async (req, res) => {
     try {
         const { role } = req.body;
@@ -764,6 +714,7 @@ app.put('/api/users/:id/role', authenticateToken, authorize(PERMISSIONS.USERS_AS
     }
 });
 
+// DELETE /api/users/:id
 app.delete('/api/users/:id', authenticateToken, authorize(PERMISSIONS.USERS_DELETE), async (req, res) => {
     try {
         if (req.params.id === req.user.id) {
@@ -772,167 +723,6 @@ app.delete('/api/users/:id', authenticateToken, authorize(PERMISSIONS.USERS_DELE
         const deleted = await User.findByIdAndDelete(req.params.id);
         if (!deleted) return res.status(404).json({ success: false, message: 'User not found.' });
         return res.json({ success: true, message: 'User deleted successfully!' });
-    } catch (err) {
-        return res.status(500).json({ success: false, message: err.message });
-    }
-});
-
-// ==========================================
-// TASK 10: FILE & DOCUMENT MANAGEMENT
-// ==========================================
-
-/**
- * Wrap multer's single-file upload and translate any errors into JSON responses.
- * Any authenticated user can upload (no permission gate — matches task scope).
- */
-const uploadSingle = (req, res, next) => {
-    upload.single('file')(req, res, (err) => {
-        if (err instanceof multer.MulterError) {
-            if (err.code === 'LIMIT_FILE_SIZE') {
-                return res.status(400).json({
-                    success: false,
-                    message: `File too large. Max size is ${formatBytes(MAX_FILE_SIZE)}.`
-                });
-            }
-            return res.status(400).json({ success: false, message: err.message });
-        }
-        if (err) {
-            return res.status(400).json({ success: false, message: err.message });
-        }
-        if (!req.file) {
-            return res.status(400).json({ success: false, message: 'No file uploaded. Please choose a file.' });
-        }
-        next();
-    });
-};
-
-// POST /api/files — upload a file (any authenticated user)
-app.post('/api/files', authenticateToken, uploadSingle, async (req, res) => {
-    try {
-        const { originalname, filename, mimetype, size, path: filePath } = req.file;
-
-        const record = await File.create({
-            userId: req.user.id,
-            originalName: originalname,
-            storedName: filename,
-            mimeType: mimetype,
-            size,
-            path: filePath
-        });
-
-        return res.status(201).json({
-            success: true,
-            message: 'File uploaded successfully!',
-            data: {
-                id: record._id,
-                originalName: record.originalName,
-                mimeType: record.mimeType,
-                size: record.size,
-                sizeHuman: formatBytes(record.size),
-                uploadedAt: record.uploadedAt,
-                url: `/uploads/${record.storedName}`
-            }
-        });
-    } catch (err) {
-        // Best-effort cleanup if DB write failed after disk write succeeded
-        if (req.file && req.file.path) {
-            fs.unlink(req.file.path, () => {});
-        }
-        return res.status(500).json({ success: false, message: 'Server error saving file metadata.' });
-    }
-});
-
-// GET /api/user/files — list current user's files
-app.get('/api/user/files', authenticateToken, async (req, res) => {
-    try {
-        const files = await File.find({ userId: req.user.id }).sort({ uploadedAt: -1 });
-        const data = files.map(f => ({
-            id: f._id,
-            originalName: f.originalName,
-            mimeType: f.mimeType,
-            size: f.size,
-            sizeHuman: formatBytes(f.size),
-            uploadedAt: f.uploadedAt,
-            url: `/uploads/${f.storedName}`
-        }));
-        return res.json({ success: true, data });
-    } catch (err) {
-        return res.status(500).json({ success: false, message: err.message });
-    }
-});// ==========================================
-// TASK 10: FILE MANAGEMENT (continued)
-// ==========================================
-
-// DELETE /api/user/files/:id — delete own file (removes from disk + DB)
-app.delete('/api/user/files/:id', authenticateToken, async (req, res) => {
-    try {
-        const file = await File.findById(req.params.id);
-        if (!file) {
-            return res.status(404).json({ success: false, message: 'File not found.' });
-        }
-
-        // Ownership check: only the owner can delete their own file
-        if (file.userId.toString() !== req.user.id) {
-            return res.status(403).json({ success: false, message: 'Access denied. You can only delete your own files.' });
-        }
-
-        // Remove from disk (best-effort — don't fail if already gone)
-        fs.unlink(file.path, (err) => {
-            if (err) console.warn('Could not delete file from disk:', err.message);
-        });
-
-        // Remove DB record
-        await File.findByIdAndDelete(req.params.id);
-
-        return res.json({ success: true, message: 'File deleted successfully!' });
-    } catch (err) {
-        return res.status(500).json({ success: false, message: err.message });
-    }
-});
-
-// GET /api/files — list all files (admin/employee with files:read_all)
-app.get('/api/files', authenticateToken, authorize(PERMISSIONS.FILES_READ_ALL), async (req, res) => {
-    try {
-        const files = await File.find()
-            .populate('userId', 'name email')
-            .sort({ uploadedAt: -1 });
-
-        const data = files.map(f => ({
-            id: f._id,
-            originalName: f.originalName,
-            mimeType: f.mimeType,
-            size: f.size,
-            sizeHuman: formatBytes(f.size),
-            uploadedAt: f.uploadedAt,
-            url: `/uploads/${f.storedName}`,
-            owner: f.userId ? {
-                id: f.userId._id,
-                name: f.userId.name,
-                email: f.userId.email
-            } : null
-        }));
-
-        return res.json({ success: true, data });
-    } catch (err) {
-        return res.status(500).json({ success: false, message: err.message });
-    }
-});
-
-// DELETE /api/files/:id — delete ANY file (admin only)
-app.delete('/api/files/:id', authenticateToken, authorize(PERMISSIONS.FILES_DELETE_ANY), async (req, res) => {
-    try {
-        const file = await File.findById(req.params.id);
-        if (!file) {
-            return res.status(404).json({ success: false, message: 'File not found.' });
-        }
-
-        // Remove from disk (best-effort)
-        fs.unlink(file.path, (err) => {
-            if (err) console.warn('Could not delete file from disk:', err.message);
-        });
-
-        await File.findByIdAndDelete(req.params.id);
-        return res.json({ success: true, message: 'File deleted successfully!' });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
     }

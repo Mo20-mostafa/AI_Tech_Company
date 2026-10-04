@@ -1,10 +1,14 @@
 /* ==========================================
    NEXUS AI - Main Client Application Logic
    Handles dynamic service rendering, search/filtering,
-   demo simulation, and public contact form submissions.
+   demo simulation, public contact form submissions,
+   and permission-aware navbar (Task 9 - RBAC).
    ========================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
+    // 0. Task 9: Adjust navbar based on login state & permissions
+    applyPermissionUI();
+
     // 1. Fetch and render public company services dynamically on initial load
     fetchServices();
 
@@ -116,8 +120,72 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==========================================
+// TASK 9: PERMISSION-AWARE UI
+// ==========================================
+
+/** Read current user from localStorage (safe) */
+function getCurrentUser() {
+    try {
+        return JSON.parse(localStorage.getItem('user') || '{}');
+    } catch {
+        return {};
+    }
+}
+
+/** Returns true if the current user has the given permission (admin always passes) */
+function can(permission) {
+    const user = getCurrentUser();
+    if (user.role === 'admin') return true;
+    return Array.isArray(user.permissions) && user.permissions.includes(permission);
+}
+
+/**
+ * Adjusts the public navbar based on login state & permissions:
+ *   - Hides "Admin Panel" link for users without admin-side permissions.
+ *   - Shows "Login/Register" for guests.
+ *   - Shows "Logout" + Dashboard/Admin links for authenticated users.
+ */
+function applyPermissionUI() {
+    const user = getCurrentUser();
+    const token = localStorage.getItem('token');
+    const isLoggedIn = !!token && !!user.email;
+
+    // 1. Admin Panel link — visible only with admin-side access
+    const adminLinks = document.querySelectorAll('[data-permission="admin-panel"]');
+    const canSeeAdminPanel = isLoggedIn && (
+        user.role === 'admin' ||
+        (Array.isArray(user.permissions) && user.permissions.some(p =>
+            ['requests:read_all', 'inquiries:read', 'services:create', 'services:update'].includes(p)
+        ))
+    );
+    adminLinks.forEach(el => {
+        el.style.display = canSeeAdminPanel ? '' : 'none';
+    });
+
+    // 2. Dashboard link — visible only for logged-in customers
+    const dashboardLinks = document.querySelectorAll('[data-permission="dashboard"]');
+    const canSeeDashboard = isLoggedIn && (user.role === 'customer' || user.role === 'user');
+    dashboardLinks.forEach(el => {
+        el.style.display = canSeeDashboard ? '' : 'none';
+    });
+
+    // 3. Login link — hidden for logged-in users
+    const loginLinks = document.querySelectorAll('[data-permission="login-link"]');
+    loginLinks.forEach(el => {
+        el.style.display = isLoggedIn ? 'none' : '';
+    });
+
+    // 4. Logout link — visible only for logged-in users
+    const logoutLinks = document.querySelectorAll('[data-permission="logout-link"]');
+    logoutLinks.forEach(el => {
+        el.style.display = isLoggedIn ? '' : 'none';
+    });
+}
+
+// ==========================================
 // DYNAMIC PUBLIC SERVICES FETCHING & BACKEND SEARCH/FILTERING (TASK 8)
 // ==========================================
+
 /**
  * Fetches company services dynamically from the backend API with optional search and sort queries.
  */
@@ -133,11 +201,11 @@ async function fetchServices() {
 
         const response = await fetch(`http://localhost:5000/api/services?${queryParams.toString()}`);
         const result = await response.json();
-        
+
         const servicesList = result.data || (Array.isArray(result) ? result : []);
 
-        const container = document.getElementById('servicesContainer') 
-            || document.getElementById('public-services-list') 
+        const container = document.getElementById('servicesContainer')
+            || document.getElementById('public-services-list')
             || document.querySelector('.services-grid');
 
         if (container) {
@@ -163,7 +231,7 @@ async function fetchServices() {
  */
 function escapeHTML(str) {
     if (!str) return '';
-    return str.replace(/[&<>'"]/g, 
+    return String(str).replace(/[&<>'"]/g,
         tag => ({
             '&': '&amp;',
             '<': '&lt;',
