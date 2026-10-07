@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projects - NEXUS AI</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: #FBF9F5; color: #1F2937; padding: 2rem; }
+
+        .page-header { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto 2rem; flex-wrap: wrap; gap: 1rem; }
+        .page-header h1 { font-size: 1.75rem; color: #111827; font-weight: 700; }
+        .page-header-links { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
+        .page-header-links a { color: #D97757; text-decoration: none; font-weight: 600; font-size: 0.9rem; transition: color 0.2s; }
+        .page-header-links a:hover { color: #C56547; }
+
+        .page-body { max-width: 1200px; margin: 0 auto; }
+
+        /* Stats row */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-box { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 1.25rem; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .stat-box .stat-number { font-size: 1.8rem; font-weight: 700; color: #D97757; line-height: 1.1; }
+        .stat-box .stat-label { font-size: 0.75rem; color: #6B7280; margin-top: 0.4rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+
+        /* Two-column layout */
+        .layout { display: grid; grid-template-columns: 1fr; gap: 2rem; }
+        @media (min-width: 900px) {
+            .layout { grid-template-columns: 380px 1fr; }
+        }
+
+        .card { background: #FFFFFF; padding: 1.75rem; border-radius: 12px; border: 1px solid #E5E7EB; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 1.5rem; }
+        .card h3 { margin-bottom: 1.25rem; color: #111827; font-size: 1.15rem; font-weight: 600; }
+
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.35rem; color: #374151; font-weight: 500; font-size: 0.85rem; }
+        .form-control { width: 100%; padding: 0.6rem; background: #FFFFFF; border: 1px solid #D1D5DB; color: #111827; border-radius: 6px; font-size: 0.9rem; outline: none; }
+        .form-control:focus { border-color: #D97757; }
+        textarea.form-control { resize: vertical; min-height: 80px; }
+        select.form-control { cursor: pointer; }
+
+        .btn { padding: 0.55rem 1.1rem; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: background 0.2s, color 0.2s; }
+        .btn-primary { background: #D97757; color: #FFFFFF; }
+        .btn-primary:hover { background: #C56547; }
+        .btn-outline { background: transparent; border: 1px solid #D1D5DB; color: #374151; }
+        .btn-outline:hover { background: #F3F4F6; }
+        .btn-danger-outline { background: transparent; border: 1px solid #c06345; color: #c06345; }
+        .btn-danger-outline:hover { background: #FEE2E2; }
+
+        .filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+        .filter-bar input, .filter-bar select { flex: 1; min-width: 130px; }
+
+        /* Project cards */
+        .project-list { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+        .project-card { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 10px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .project-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.6rem; }
+        .project-header h4 { font-size: 1.05rem; color: #111827; font-weight: 600; }
+        .project-desc { font-size: 0.9rem; color: #4B5563; line-height: 1.5; margin-bottom: 0.75rem; }
+        .project-meta { font-size: 0.82rem; color: #6B7280; margin-bottom: 0.5rem; }
+        .project-meta strong { color: #374151; }
+
+        .members-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.5rem; margin-bottom: 1rem; }
+        .member-chip { background: #FBF9F5; border: 1px solid #E5E7EB; padding: 3px 9px; border-radius: 12px; font-size: 0.75rem; color: #374151; }
+
+        .project-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; padding-top: 0.85rem; border-top: 1px solid #F3F4F6; }
+        .project-actions select { padding: 4px 8px; border-radius: 4px; border: 1px solid #D1D5DB; font-weight: 600; font-size: 0.82rem; cursor: pointer; }
+
+        /* Badges */
+        .badge { padding: 4px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: 600; display: inline-block; white-space: nowrap; }
+        .badge-not-started { background-color: #F3F4F6; color: #374151; }
+        .badge-in-progress { background-color: #E0F2FE; color: #075985; }
+        .badge-completed { background-color: #D1FAE5; color: #065F46; }
+        .badge-on-hold { background-color: #FEF3C7; color: #92400E; }
+
+        /* Empty / loading states */
+        .state-msg { text-align: center; color: #6B7280; padding: 2rem 0; font-size: 0.95rem; }
+        .state-msg.error { color: #EF4444; }
+
+        /* Hidden helper */
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- Page Header -->
+    <div class="page-header">
+        <h1>📁 Projects</h1>
+        <div class="page-header-links">
+            <a href="index.html">Home</a>
+            <a href="dashboard.html" data-permission="dashboard">My Dashboard</a>
+            <a href="admin.html" data-permission="admin-panel">Admin Panel</a>
+            <button class="btn btn-outline" id="logoutBtn">Logout</button>
+        </div>
+    </div>
+
+    <!-- Page Body -->
+    <div class="page-body">
+
+        <!-- Stats (Admin only) -->
+        <div class="stats-grid" data-role="admin">
+            <div class="stat-box">
+                <div class="stat-number" id="statTotal">—</div>
+                <div class="stat-label">Total</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="statNotStarted">—</div>
+                <div class="stat-label">Not Started</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="statInProgress">—</div>
+                <div class="stat-label">In Progress</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="statCompleted">—</div>
+                <div class="stat-label">Completed</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="statOnHold">—</div>
+                <div class="stat-label">On Hold</div>
+            </div>
+        </div>
+
+        <div class="layout">
+
+            <!-- LEFT COLUMN: Create Project form (Admin only) -->
+            <div>
+                <div class="card" data-permission="projects:create">
+                    <h3>Create New Project</h3>
+                    <form id="createProjectForm">
+                        <div class="form-group">
+                            <label>Project Name</label>
+                            <input type="text" id="projName" class="form-control" placeholder="e.g. AI Chatbot Rollout" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <textarea id="projDescription" class="form-control" placeholder="Brief project description..." required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Client (Customer)</label>
+                            <select id="projClient" class="form-control" required>
+                                <option value="">Loading customers...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Assigned Team Members (optional)</label>
+                            <select id="projMembers" class="form-control" multiple size="4">
+                                <option value="">Loading team members...</option>
+                            </select>
+                            <small style="color:#6B7280; font-size:0.75rem;">Ctrl+Click to select multiple</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width:100%;">Create Project</button>
+                        <div id="createProjectMsg" style="margin-top:0.75rem; font-weight:600; font-size:0.85rem;"></div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Projects list -->
+            <div>
+                <div class="card">
+                    <h3>All Projects</h3>
+
+                    <div class="filter-bar">
+                        <input type="text" id="projSearchInput" class="form-control" placeholder="🔍 Search by name...">
+                        <select id="projStatusFilter" class="form-control">
+                            <option value="ALL">All Statuses</option>
+                            <option value="Not Started">Not Started</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                            <option value="On Hold">On Hold</option>
+                        </select>
+                    </div>
+
+                    <div id="projectsList" class="project-list">
+                        <p class="state-msg">Loading projects...</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 1. Shared auth helpers + utilities (MUST be loaded first) -->
+    <script src="js/auth.js"></script>
+    <!-- 2. Projects page logic -->
+    <script src="js/projects.js"></script>
+</body>
+</html>

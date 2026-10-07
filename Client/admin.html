@@ -8,7 +8,12 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background-color: #FBF9F5; color: #1F2937; padding: 2rem; }
         
-        .admin-header { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto 2rem; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto 2rem; flex-wrap: wrap; gap: 1rem; }
+        .admin-header h2 { color: #111827; font-size: 1.5rem; font-weight: 700; }
+        .admin-header-links { display: flex; align-items: center; gap: 1.25rem; }
+        .admin-header-links a { color: #D97757; text-decoration: none; font-weight: 600; font-size: 0.9rem; transition: color 0.2s; }
+        .admin-header-links a:hover { color: #C56547; }
+
         .admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 2rem; max-width: 1200px; margin: 0 auto; }
         
         .card { background: #FFFFFF; padding: 2rem; border-radius: 12px; border: 1px solid #E5E7EB; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
@@ -19,7 +24,6 @@
         .form-control { width: 100%; padding: 0.65rem; background: #FFFFFF; border: 1px solid #D1D5DB; color: #111827; border-radius: 6px; font-size: 0.9rem; outline: none; }
         .form-control:focus { border-color: #D97757; }
         
-        /* Task 8 UI: Admin Search & Filter Controls */
         .filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
         .filter-bar input, .filter-bar select { flex: 1; min-width: 120px; }
 
@@ -28,7 +32,6 @@
         .btn-primary:hover { background: #C56547; }
         .btn-danger { background: #FEE2E2; color: #991B1B; }
         .btn-danger:hover { background: #FCA5A5; }
-        .btn-warning { background: #FEF3C7; color: #92400E; margin-right: 0.5rem; }
         .btn-outline { background: transparent; border: 1px solid #D1D5DB; color: #374151; }
         .btn-outline:hover { background: #F3F4F6; }
         
@@ -36,18 +39,27 @@
         .service-item h4, .inquiry-item h4, .request-item h4, .service-card h3 { color: #111827; font-size: 1rem; }
         .service-item p, .inquiry-item p, .request-item p, .service-card p { color: #6B7280; font-size: 0.85rem; margin-top: 0.2rem; }
 
-        .status-select { padding: 4px 8px; border-radius: 6px; border: 1px solid #D1D5DB; font-weight: 600; font-size: 0.82rem; cursor: pointer; outline: none; }
+        /* Task 11 — Project Statistics Widget */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem; }
+        .stat-box { background: #FBF9F5; border: 1px solid #E5E7EB; border-radius: 8px; padding: 0.85rem; text-align: center; }
+        .stat-box .stat-number { font-size: 1.6rem; font-weight: 700; color: #D97757; line-height: 1.1; }
+        .stat-box .stat-label { font-size: 0.75rem; color: #6B7280; margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.03em; }
 
         #adminServicesGrid { display: block; }
         #adminFilesList { display: block; }
+
+        /* Hidden helper */
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
     <div class="admin-header">
         <h2>Admin Management Panel</h2>
-        <div>
-            <a href="index.html" style="color:#D97757; margin-right: 1.5rem; text-decoration: none; font-weight: 600;">View Public Site</a>
+        <div class="admin-header-links">
+            <a href="index.html">View Public Site</a>
+            <!-- Task 11 — Projects link (visible for anyone with projects access) -->
+            <a href="projects.html" data-permission="projects-link">📁 Projects</a>
             <button class="btn btn-danger" id="logoutBtn">Logout</button>
         </div>
     </div>
@@ -118,18 +130,55 @@
             </p>
             <div id="adminFilesList">Loading files...</div>
         </div>
+
+        <!-- 5. TASK 11 — Project Statistics Widget -->
+        <div class="card" data-permission="projects:read">
+            <h3>Project Statistics (Task 11)</h3>
+            <p style="color:#6B7280; font-size:0.85rem; margin-bottom:1rem;">
+                Overview of all projects across the platform.
+            </p>
+
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-number" id="statTotal">—</div>
+                    <div class="stat-label">Total</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="statNotStarted">—</div>
+                    <div class="stat-label">Not Started</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="statInProgress">—</div>
+                    <div class="stat-label">In Progress</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="statCompleted">—</div>
+                    <div class="stat-label">Completed</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="statOnHold">—</div>
+                    <div class="stat-label">On Hold</div>
+                </div>
+            </div>
+
+            <a href="projects.html" class="btn btn-primary" style="display:inline-block; text-decoration:none; margin-top:0.5rem;">
+                Go to Projects →
+            </a>
+        </div>
     </div>
 
-    <!-- External admin logic (RBAC-aware + Task 10) -->
+    <!-- 1. Shared auth helpers + utilities (MUST be loaded first) -->
+    <script src="js/auth.js"></script>
+    <!-- 2. Admin-specific logic (uses helpers from auth.js) -->
     <script src="js/admin.js"></script>
 
-    <!-- Inline: Load inquiries (uses the same auth headers pattern) -->
+    <!-- Inline: Load inquiries (uses global escapeHTML from auth.js) -->
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             const list = document.getElementById('adminInquiriesList');
             if (!list) return;
 
-            const token = localStorage.getItem('token');
+            const token = getToken();
             if (!token) return;
 
             try {
@@ -153,11 +202,6 @@
                 list.innerHTML = '<p style="color:#EF4444">Error fetching inquiries.</p>';
             }
         });
-
-        function escapeHTML(str) {
-            if (!str) return '';
-            return String(str).replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
-        }
     </script>
 </body>
 </html>

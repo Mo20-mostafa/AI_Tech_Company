@@ -8,9 +8,9 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background-color: #FBF9F5; color: #1F2937; line-height: 1.6; }
         
-        .navbar { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 8%; background: #FBF9F5; border-bottom: 1px solid #E5E7EB; position: sticky; top: 0; z-index: 100; }
+        .navbar { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 8%; background: #FBF9F5; border-bottom: 1px solid #E5E7EB; position: sticky; top: 0; z-index: 100; flex-wrap: wrap; gap: 1rem; }
         .logo { font-size: 1.4rem; font-weight: 800; color: #111827; text-decoration: none; letter-spacing: -0.5px; }
-        .nav-links { display: flex; align-items: center; gap: 2rem; }
+        .nav-links { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
         .nav-links a { color: #4B5563; text-decoration: none; font-weight: 500; font-size: 0.95rem; transition: color 0.2s; }
         .nav-links a:hover { color: #111827; }
         .btn-nav-action { background: #D97757; color: #FFFFFF !important; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600 !important; }
@@ -25,7 +25,6 @@
         .container { max-width: 1100px; margin: 0 auto; padding: 3rem 1rem; }
         .section-title { font-size: 1.8rem; text-align: center; margin-bottom: 1.5rem; color: #111827; font-weight: 700; }
         
-        /* Task 8: Search & Filter Toolbar Styles */
         .search-filter-container { display: flex; gap: 1rem; max-width: 700px; margin: 0 auto 2.5rem; flex-wrap: wrap; }
         .search-input { flex: 2; min-width: 240px; padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid #D1D5DB; outline: none; font-size: 0.95rem; background: #FFFFFF; }
         .search-input:focus { border-color: #D97757; }
@@ -58,6 +57,9 @@
             <a href="#services">Services</a>
             <a href="#contact">Contact</a>
 
+            <!-- Task 11 — Projects (visible for anyone with projects access) -->
+            <a href="projects.html" data-permission="projects-link" style="display:none;">📁 Projects</a>
+
             <!-- Task 9: RBAC-aware navbar links -->
             <a href="login.html" id="auth-link" data-permission="login-link">Account / Login</a>
             <a href="admin.html" id="admin-link" data-permission="admin-panel" class="btn-nav-secondary" style="display:none;">Admin Panel</a>
@@ -74,7 +76,6 @@
     <main class="container" id="services">
         <h2 class="section-title">Our Dynamic Services</h2>
         
-        <!-- Task 8: Dynamic Search & Filtering Interface Controls -->
         <div class="search-filter-container">
             <input type="text" id="publicSearchInput" class="search-input" placeholder="🔍 Search services by title or keyword..." />
             <select id="publicSortSelect" class="filter-select">
@@ -116,8 +117,9 @@
         </div>
     </section>
 
-    <!-- External Main Logic (handles services, contact, permissions, logout) -->
-    <!-- NOTE: auth.js is for login.html only -->
+    <!-- 1. Shared auth helpers + utilities (MUST be loaded first) -->
+    <script src="js/auth.js"></script>
+    <!-- 2. Main page logic (uses helpers from auth.js) -->
     <script src="js/main.js"></script>
 </body>
 </html>

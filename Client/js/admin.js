@@ -3,55 +3,18 @@
    Task 6 (Services CMS), Task 7 (Request Management), Task 8 (Search & Filtering)
    Task 9 (RBAC — Permission-Based UI)
    Task 10 (File Management — Admin View)
+   Task 11 (Project Statistics Widget)
+
+   NOTE: This file depends on helpers defined in `js/auth.js`:
+         - getToken, getUser, getCurrentUser, can, canAny
+         - apiFetch, escapeHTML, escapeQuotes, debounce
+         - applyPermissionUI, handleLogout
    ========================================== */
 
 const SERVICES_API_URL = 'http://localhost:5000/api/services';
 const REQUESTS_API_URL = 'http://localhost:5000/api/admin/requests';
-const FILES_API_URL = 'http://localhost:5000/api/files'; // Task 10 — all files
-
-// ------------------------------------------
-// PERMISSION HELPERS (Task 9)
-// ------------------------------------------
-
-/** Read current user object from localStorage (safe parse) */
-function getCurrentUser() {
-    try {
-        return JSON.parse(localStorage.getItem('user') || '{}');
-    } catch {
-        return {};
-    }
-}
-
-/** Returns true if current user has the given permission (admin always passes) */
-function can(permission) {
-    const user = getCurrentUser();
-    if (user.role === 'admin') return true;
-    return Array.isArray(user.permissions) && user.permissions.includes(permission);
-}
-
-/** Returns true if user has ANY of the given permissions */
-function canAny(permissions = []) {
-    const user = getCurrentUser();
-    if (user.role === 'admin') return true;
-    const own = Array.isArray(user.permissions) ? user.permissions : [];
-    return permissions.some(p => own.includes(p));
-}
-
-/** Hides elements that require permissions the user doesn't have */
-function applyPermissionUI() {
-    // Hide Add/Update Service form if user can't create or update services
-    const serviceForm = document.getElementById('serviceForm');
-    if (serviceForm && !can('services:create') && !can('services:update')) {
-        const wrapper = serviceForm.closest('.card') || serviceForm.parentElement;
-        if (wrapper) wrapper.style.display = 'none';
-    }
-
-    // Hide "Add Service" heading if the form is hidden
-    const formTitle = document.getElementById('formTitle');
-    if (formTitle && !can('services:create') && !can('services:update')) {
-        formTitle.style.display = 'none';
-    }
-}
+const FILES_API_URL = 'http://localhost:5000/api/files';
+const PROJECTS_STATS_URL = 'http://localhost:5000/api/projects/stats'; // Task 11
 
 // ------------------------------------------
 // PAGE ACCESS GUARD
@@ -60,27 +23,31 @@ function applyPermissionUI() {
 /**
  * Guards admin.html — allows:
  *   - admin (all permissions)
- *   - employee (any admin-side permission like requests:read_all or inquiries:read)
+ *   - employee / team_member (any admin-side permission)
  * Redirects everyone else back to login.
  */
 function guardPageAccess() {
-    const token = localStorage.getItem('token');
-    const user = getCurrentUser();
+    const token = getToken();
+    const user = getUser();
 
-    if (!token) {
+    if (!token || !user) {
         alert('Please log in first.');
         window.location.href = 'login.html';
         return false;
     }
 
-    const allowed = user.role === 'admin' || canAny([
-        'requests:read_all',
-        'inquiries:read',
-        'services:create',
-        'services:update',
-        'services:delete',
-        'files:read_all' // Task 10 — employee can access admin panel for files
-    ]);
+    const allowed = user.role === 'admin'
+        || user.role === 'employee'
+        || user.role === 'team_member'
+        || canAny([
+            'requests:read_all',
+            'inquiries:read',
+            'services:create',
+            'services:update',
+            'services:delete',
+            'files:read_all',
+            'projects:read'
+        ]);
 
     if (!allowed) {
         alert('Unauthorized access! Insufficient permissions.');
@@ -88,15 +55,6 @@ function guardPageAccess() {
         return false;
     }
     return true;
-}
-
-/** Standard admin/employee auth headers */
-function getAuthHeaders() {
-    const token = localStorage.getItem('token');
-    return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-    };
 }
 
 // ------------------------------------------
@@ -111,7 +69,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Initial data loads
     loadAdminServices();
     loadAdminRequests();
-    loadAllFiles(); // Task 10
+    loadAllFiles();
+    loadProjectStats(); // Task 11
 
     // 3. Service form (create / update)
     const serviceForm = document.getElementById('serviceForm');
@@ -121,16 +80,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const cancelEditBtn = document.getElementById('cancelEditBtn');
     if (cancelEditBtn) cancelEditBtn.addEventListener('click', resetForm);
 
-    // 5. Logout — clear everything session-related
+    // 5. Logout (delegates to handleLogout from auth.js)
     const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            localStorage.removeItem('permissions');
-            window.location.href = 'login.html';
-        });
-    }
+    if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
 
     // 6. Task 8 — Search & Sorting for services
     const adminSearchInput = document.getElementById('adminSearchInput');
@@ -154,10 +106,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // TASK 6 & 8: SERVICES MANAGEMENT
 // ------------------------------------------
 
-/**
- * Fetch and render services with backend search & sorting.
- * Also hides Edit/Delete buttons per user permissions.
- */
 async function loadAdminServices() {
     const grid = document.getElementById('adminServicesGrid');
     if (!grid) return;
@@ -206,7 +154,6 @@ async function loadAdminServices() {
     }
 }
 
-/** Create (POST) or Update (PUT) a service */
 async function handleServiceSubmit(e) {
     e.preventDefault();
     const id = document.getElementById('serviceId').value;
@@ -214,7 +161,6 @@ async function handleServiceSubmit(e) {
     const description = document.getElementById('serviceDescription').value.trim();
     const statusMsg = document.getElementById('adminStatusMsg');
 
-    // Client-side permission check (backend will verify too)
     const requiredPerm = id ? 'services:update' : 'services:create';
     if (!can(requiredPerm)) {
         if (statusMsg) {
@@ -230,7 +176,10 @@ async function handleServiceSubmit(e) {
     try {
         const response = await fetch(endpoint, {
             method,
-            headers: getAuthHeaders(),
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getToken()}`
+            },
             body: JSON.stringify({ title, description })
         });
 
@@ -251,7 +200,6 @@ async function handleServiceSubmit(e) {
     }
 }
 
-/** Populate form for editing */
 function prepareEdit(id, title, description) {
     if (!can('services:update')) return;
 
@@ -264,7 +212,6 @@ function prepareEdit(id, title, description) {
     document.getElementById('cancelEditBtn').style.display = 'inline-block';
 }
 
-/** Delete a service */
 async function deleteService(id) {
     if (!can('services:delete')) {
         alert('You do not have permission to delete services.');
@@ -275,7 +222,7 @@ async function deleteService(id) {
     try {
         const response = await fetch(`${SERVICES_API_URL}/${id}`, {
             method: 'DELETE',
-            headers: getAuthHeaders()
+            headers: { 'Authorization': `Bearer ${getToken()}` }
         });
 
         if (response.ok) {
@@ -289,7 +236,6 @@ async function deleteService(id) {
     }
 }
 
-/** Reset service form */
 function resetForm() {
     const serviceForm = document.getElementById('serviceForm');
     if (serviceForm) serviceForm.reset();
@@ -303,7 +249,6 @@ function resetForm() {
 // TASK 7 & 8: REQUEST MANAGEMENT
 // ------------------------------------------
 
-/** Fetch and render customer requests (with optional status filter) */
 async function loadAdminRequests() {
     const container = document.getElementById('adminRequestsContainer')
         || document.getElementById('adminRequestsList')
@@ -314,7 +259,9 @@ async function loadAdminRequests() {
     const selectedStatus = document.getElementById('requestStatusFilter')?.value || 'ALL';
 
     try {
-        const response = await fetch(REQUESTS_API_URL, { headers: getAuthHeaders() });
+        const response = await fetch(REQUESTS_API_URL, {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
         const result = await response.json();
         let requests = result.data || (Array.isArray(result) ? result : []);
 
@@ -333,7 +280,6 @@ async function loadAdminRequests() {
             const clientName = req.userId?.name ? escapeHTML(req.userId.name) : 'Unknown Client';
             const clientEmail = req.userId?.email ? escapeHTML(req.userId.email) : 'N/A';
 
-            // If user can't update status, show a read-only badge instead of a select
             const statusControl = canUpdateStatus
                 ? `<select onchange="updateAdminRequestStatus('${req._id}', this.value)" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold;">
                         <option value="Pending" ${req.status === 'Pending' ? 'selected' : ''}>Pending ⏳</option>
@@ -366,7 +312,6 @@ async function loadAdminRequests() {
     }
 }
 
-/** Update a request status */
 async function updateAdminRequestStatus(requestId, newStatus) {
     if (!can('requests:update_status')) {
         alert('You do not have permission to update request statuses.');
@@ -376,7 +321,10 @@ async function updateAdminRequestStatus(requestId, newStatus) {
     try {
         const response = await fetch(`${REQUESTS_API_URL}/${requestId}/status`, {
             method: 'PUT',
-            headers: getAuthHeaders(),
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getToken()}`
+            },
             body: JSON.stringify({ status: newStatus })
         });
 
@@ -397,15 +345,10 @@ async function updateAdminRequestStatus(requestId, newStatus) {
 // TASK 10: FILE MANAGEMENT (Admin View)
 // ------------------------------------------
 
-/**
- * Load and render all uploaded files (admin/employee with files:read_all).
- * Admin additionally sees a Delete button (files:delete_any).
- */
 async function loadAllFiles() {
     const container = document.getElementById('adminFilesList');
     if (!container) return;
 
-    // If user has no permission at all, hide the container section
     if (!can('files:read_all')) {
         const wrapper = container.closest('.card') || container.parentElement;
         if (wrapper) wrapper.style.display = 'none';
@@ -413,7 +356,9 @@ async function loadAllFiles() {
     }
 
     try {
-        const response = await fetch(FILES_API_URL, { headers: getAuthHeaders() });
+        const response = await fetch(FILES_API_URL, {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
         const result = await response.json();
 
         if (!response.ok) {
@@ -468,7 +413,6 @@ async function loadAllFiles() {
     }
 }
 
-/** Delete ANY file (admin only) */
 async function deleteAnyFile(fileId, fileName) {
     if (!can('files:delete_any')) {
         alert('You do not have permission to delete files.');
@@ -479,7 +423,7 @@ async function deleteAnyFile(fileId, fileName) {
     try {
         const response = await fetch(`${FILES_API_URL}/${fileId}`, {
             method: 'DELETE',
-            headers: getAuthHeaders()
+            headers: { 'Authorization': `Bearer ${getToken()}` }
         });
         const result = await response.json();
 
@@ -495,25 +439,32 @@ async function deleteAnyFile(fileId, fileName) {
 }
 
 // ------------------------------------------
-// UTILITIES
+// TASK 11: PROJECT STATISTICS WIDGET
 // ------------------------------------------
 
-function escapeHTML(str) {
-    if (!str) return '';
-    return String(str).replace(/[&<>'"]/g, tag => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-    }[tag] || tag));
-}
+/**
+ * Load project statistics for the admin dashboard widget.
+ * Only admins can see the full stats (backend enforces this).
+ */
+async function loadProjectStats() {
+    // Only show for users with projects:read
+    if (!can('projects:read')) return;
 
-function escapeQuotes(str) {
-    if (!str) return '';
-    return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-}
+    try {
+        const result = await apiFetch('/projects/stats');
 
-function debounce(func, delay = 300) {
-    let timeout;
-    return (...args) => {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(this, args), delay);
-    };
+        if (!result.success || !result.data) {
+            // Silently skip — the widget stays with dashes
+            return;
+        }
+
+        const s = result.data;
+        document.getElementById('statTotal').textContent = s.total ?? '—';
+        document.getElementById('statNotStarted').textContent = s.notStarted ?? '—';
+        document.getElementById('statInProgress').textContent = s.inProgress ?? '—';
+        document.getElementById('statCompleted').textContent = s.completed ?? '—';
+        document.getElementById('statOnHold').textContent = s.onHold ?? '—';
+    } catch (err) {
+        console.warn('Could not load project stats:', err.message);
+    }
 }

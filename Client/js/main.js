@@ -2,7 +2,7 @@
    NEXUS AI - Main Client Application Logic
    Handles dynamic service rendering, search/filtering,
    demo simulation, public contact form submissions,
-   and permission-aware navbar (Task 9 - RBAC).
+   and permission-aware navbar (Task 9 - RBAC + Task 11).
    ========================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -144,6 +144,7 @@ function can(permission) {
  *   - Hides "Admin Panel" link for users without admin-side permissions.
  *   - Shows "Login/Register" for guests.
  *   - Shows "Logout" + Dashboard/Admin links for authenticated users.
+ *   - Task 11: Shows "Projects" link for users with projects access.
  */
 function applyPermissionUI() {
     const user = getCurrentUser();
@@ -179,6 +180,19 @@ function applyPermissionUI() {
     const logoutLinks = document.querySelectorAll('[data-permission="logout-link"]');
     logoutLinks.forEach(el => {
         el.style.display = isLoggedIn ? '' : 'none';
+    });
+
+    // 5. Task 11 — Projects link (visible for any authenticated user with project access)
+    const projectsLinks = document.querySelectorAll('[data-permission="projects-link"]');
+    const canSeeProjects = isLoggedIn && (
+        user.role === 'admin' ||
+        user.role === 'team_member' ||
+        user.role === 'employee' ||
+        user.role === 'customer' ||
+        (Array.isArray(user.permissions) && user.permissions.includes('projects:read'))
+    );
+    projectsLinks.forEach(el => {
+        el.style.display = canSeeProjects ? '' : 'none';
     });
 }
 

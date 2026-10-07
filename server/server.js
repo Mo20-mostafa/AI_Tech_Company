@@ -96,7 +96,13 @@ const PERMISSIONS = {
     ROLES_DELETE: 'roles:delete',
     // Task 10 — file management
     FILES_READ_ALL: 'files:read_all',
-    FILES_DELETE_ANY: 'files:delete_any'
+    FILES_DELETE_ANY: 'files:delete_any',
+    // Task 11 — project management
+    PROJECTS_READ: 'projects:read',
+    PROJECTS_CREATE: 'projects:create',
+    PROJECTS_UPDATE: 'projects:update',
+    PROJECTS_DELETE: 'projects:delete',
+    PROJECTS_ASSIGN: 'projects:assign'
 };
 
 // Default roles seeded on boot (source of truth)
@@ -115,7 +121,8 @@ const DEFAULT_ROLES = {
             PERMISSIONS.REQUESTS_READ_ALL,
             PERMISSIONS.REQUESTS_UPDATE_STATUS,
             PERMISSIONS.USERS_READ,
-            PERMISSIONS.FILES_READ_ALL
+            PERMISSIONS.FILES_READ_ALL,
+            PERMISSIONS.PROJECTS_READ // Task 11
         ]
     },
     customer: {
@@ -124,7 +131,18 @@ const DEFAULT_ROLES = {
         permissions: [
             PERMISSIONS.SERVICES_READ,
             PERMISSIONS.REQUESTS_CREATE_OWN,
-            PERMISSIONS.REQUESTS_READ_OWN
+            PERMISSIONS.REQUESTS_READ_OWN,
+            PERMISSIONS.PROJECTS_READ // Task 11 — can view own projects
+        ]
+    },
+    // Task 11 — new role for project team members
+    team_member: {
+        displayName: 'Team Member',
+        description: 'Can view and update assigned projects',
+        permissions: [
+            PERMISSIONS.SERVICES_READ,
+            PERMISSIONS.PROJECTS_READ,
+            PERMISSIONS.PROJECTS_UPDATE
         ]
     }
 };
@@ -213,6 +231,23 @@ const fileSchema = new mongoose.Schema({
     uploadedAt: { type: Date, default: Date.now }
 });
 const File = mongoose.model('File', fileSchema);
+
+// Project Model (Task 11) — client project management
+const projectSchema = new mongoose.Schema({
+    name: { type: String, required: true, trim: true },
+    description: { type: String, required: true, trim: true },
+    status: {
+        type: String,
+        enum: ['Not Started', 'In Progress', 'Completed', 'On Hold'],
+        default: 'Not Started'
+    },
+    client: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    assignedMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+const Project = mongoose.model('Project', projectSchema);
 
 // ==========================================
 // HELPERS
@@ -859,9 +894,7 @@ app.get('/api/user/files', authenticateToken, async (req, res) => {
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
     }
-});// ==========================================
-// TASK 10: FILE MANAGEMENT (continued)
-// ==========================================
+});
 
 // DELETE /api/user/files/:id — delete own file (removes from disk + DB)
 app.delete('/api/user/files/:id', authenticateToken, async (req, res) => {
@@ -933,6 +966,268 @@ app.delete('/api/files/:id', authenticateToken, authorize(PERMISSIONS.FILES_DELE
 
         await File.findByIdAndDelete(req.params.id);
         return res.json({ success: true, message: 'File deleted successfully!' });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ==========================================
+// TASK 11: CLIENT PROJECT MANAGEMENT
+// ==========================================
+
+/**
+ * GET /api/projects
+ * List projects based on user role:
+ * - Admin: all projects
+ * - Team Member: projects where they are assigned
+ * - Customer: projects where they are the client
+ */
+app.get('/api/projects', authenticateToken, authorize(PERMISSIONS.PROJECTS_READ), async (req, res) => {
+    try {
+        let filter = {};
+
+        if (req.user.role === 'admin') {
+            filter = {};
+        } else if (req.user.role === 'team_member') {
+            filter = { assignedMembers: req.user.id };
+        } else if (req.user.role === 'customer') {
+            filter = { client: req.user.id };
+        } else {
+            return res.status(403).json({ success: false, message: 'Access denied.' });
+        }
+
+        const projects = await Project.find(filter)
+            .populate('client', 'name email')
+            .populate('assignedMembers', 'name email')
+            .populate('createdBy', 'name email')
+            .sort({ createdAt: -1 });
+
+        return res.json({ success: true, data: projects });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * GET /api/projects/stats
+ * Get project statistics for dashboard (Admin only)
+ */
+app.get('/api/projects/stats', authenticateToken, authorize(PERMISSIONS.PROJECTS_READ), async (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: 'Access denied.' });
+        }
+
+        const total = await Project.countDocuments();
+        const notStarted = await Project.countDocuments({ status: 'Not Started' });
+        const inProgress = await Project.countDocuments({ status: 'In Progress' });
+        const completed = await Project.countDocuments({ status: 'Completed' });
+        const onHold = await Project.countDocuments({ status: 'On Hold' });
+
+        return res.json({
+            success: true,
+            data: { total, notStarted, inProgress, completed, onHold }
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * GET /api/projects/:id
+ * Get single project details (with access control)
+ */
+app.get('/api/projects/:id', authenticateToken, authorize(PERMISSIONS.PROJECTS_READ), async (req, res) => {
+    try {
+        const project = await Project.findById(req.params.id)
+            .populate('client', 'name email')
+            .populate('assignedMembers', 'name email')
+            .populate('createdBy', 'name email');
+
+        if (!project) {
+            return res.status(404).json({ success: false, message: 'Project not found.' });
+        }
+
+        if (req.user.role !== 'admin') {
+            const isAssigned = project.assignedMembers.some(m => m._id.toString() === req.user.id);
+            const isClient = project.client._id.toString() === req.user.id;
+            if (!isAssigned && !isClient) {
+                return res.status(403).json({ success: false, message: 'Access denied. You are not assigned to this project.' });
+            }
+        }
+
+        return res.json({ success: true, data: project });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * POST /api/projects
+ * Create a new project (Admin only)
+ */
+app.post('/api/projects', authenticateToken, authorize(PERMISSIONS.PROJECTS_CREATE), async (req, res) => {
+    try {
+        const { name, description, client, assignedMembers } = req.body;
+
+        if (!name?.trim() || !description?.trim() || !client) {
+            return res.status(400).json({ success: false, message: 'Name, description, and client are required.' });
+        }
+
+        const clientUser = await User.findById(client);
+        if (!clientUser || clientUser.role !== 'customer') {
+            return res.status(400).json({ success: false, message: 'Invalid client. Must be a registered customer.' });
+        }
+
+        let validMembers = [];
+        if (Array.isArray(assignedMembers) && assignedMembers.length > 0) {
+            const members = await User.find({ _id: { $in: assignedMembers }, role: 'team_member' });
+            validMembers = members.map(m => m._id);
+        }
+
+        const project = await Project.create({
+            name: name.trim(),
+            description: description.trim(),
+            client,
+            assignedMembers: validMembers,
+            createdBy: req.user.id
+        });
+
+        const populated = await Project.findById(project._id)
+            .populate('client', 'name email')
+            .populate('assignedMembers', 'name email')
+            .populate('createdBy', 'name email');
+
+        return res.status(201).json({ success: true, message: 'Project created successfully!', data: populated });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * PUT /api/projects/:id
+ * Update project (Admin, or assigned Team Member)
+ */
+app.put('/api/projects/:id', authenticateToken, authorize(PERMISSIONS.PROJECTS_UPDATE), async (req, res) => {
+    try {
+        const project = await Project.findById(req.params.id);
+        if (!project) {
+            return res.status(404).json({ success: false, message: 'Project not found.' });
+        }
+
+        if (req.user.role !== 'admin') {
+            const isAssigned = project.assignedMembers.some(m => m.toString() === req.user.id);
+            if (!isAssigned) {
+                return res.status(403).json({ success: false, message: 'Access denied. You are not assigned to this project.' });
+            }
+        }
+
+        const { name, description } = req.body;
+        if (name?.trim()) project.name = name.trim();
+        if (description?.trim()) project.description = description.trim();
+        project.updatedAt = Date.now();
+
+        await project.save();
+
+        const populated = await Project.findById(project._id)
+            .populate('client', 'name email')
+            .populate('assignedMembers', 'name email')
+            .populate('createdBy', 'name email');
+
+        return res.json({ success: true, message: 'Project updated successfully!', data: populated });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * PUT /api/projects/:id/status
+ * Update project status (Admin, or assigned Team Member)
+ */
+app.put('/api/projects/:id/status', authenticateToken, authorize(PERMISSIONS.PROJECTS_UPDATE), async (req, res) => {
+    try {
+        const { status } = req.body;
+        const validStatuses = ['Not Started', 'In Progress', 'Completed', 'On Hold'];
+
+        if (!status || !validStatuses.includes(status)) {
+            return res.status(400).json({ success: false, message: 'Invalid or missing status value.' });
+        }
+
+        const project = await Project.findById(req.params.id);
+        if (!project) {
+            return res.status(404).json({ success: false, message: 'Project not found.' });
+        }
+
+        if (req.user.role !== 'admin') {
+            const isAssigned = project.assignedMembers.some(m => m.toString() === req.user.id);
+            if (!isAssigned) {
+                return res.status(403).json({ success: false, message: 'Access denied. You are not assigned to this project.' });
+            }
+        }
+
+        project.status = status;
+        project.updatedAt = Date.now();
+        await project.save();
+
+        const populated = await Project.findById(project._id)
+            .populate('client', 'name email')
+            .populate('assignedMembers', 'name email')
+            .populate('createdBy', 'name email');
+
+        return res.json({ success: true, message: 'Project status updated successfully!', data: populated });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * PUT /api/projects/:id/assign
+ * Assign team members to project (Admin only)
+ */
+app.put('/api/projects/:id/assign', authenticateToken, authorize(PERMISSIONS.PROJECTS_ASSIGN), async (req, res) => {
+    try {
+        const { assignedMembers } = req.body;
+
+        if (!Array.isArray(assignedMembers)) {
+            return res.status(400).json({ success: false, message: 'assignedMembers must be an array of user IDs.' });
+        }
+
+        const project = await Project.findById(req.params.id);
+        if (!project) {
+            return res.status(404).json({ success: false, message: 'Project not found.' });
+        }
+
+        const members = await User.find({ _id: { $in: assignedMembers }, role: 'team_member' });
+        if (members.length !== assignedMembers.length) {
+            return res.status(400).json({ success: false, message: 'One or more users are not valid team members.' });
+        }
+
+        project.assignedMembers = members.map(m => m._id);
+        project.updatedAt = Date.now();
+        await project.save();
+
+        const populated = await Project.findById(project._id)
+            .populate('client', 'name email')
+            .populate('assignedMembers', 'name email')
+            .populate('createdBy', 'name email');
+
+        return res.json({ success: true, message: 'Team members assigned successfully!', data: populated });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * DELETE /api/projects/:id
+ * Delete project (Admin only)
+ */
+app.delete('/api/projects/:id', authenticateToken, authorize(PERMISSIONS.PROJECTS_DELETE), async (req, res) => {
+    try {
+        const project = await Project.findByIdAndDelete(req.params.id);
+        if (!project) {
+            return res.status(404).json({ success: false, message: 'Project not found.' });
+        }
+        return res.json({ success: true, message: 'Project deleted successfully!' });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
     }

@@ -1,13 +1,23 @@
 /* ==========================================
    NEXUS AI - Customer Dashboard Logic
    Tasks 5 (Profile), 7 (Customer Requests),
-   9 (RBAC), 10 (File Management)
+   9 (RBAC), 10 (File Management), 11 (My Projects)
+
+   NOTE: This file depends on helpers defined in `js/auth.js`:
+         - getToken, getUser, can, canAny
+         - apiFetch, escapeHTML, escapeQuotes, debounce
+         - applyPermissionUI, handleLogout
    ========================================== */
 
 const API_URL = 'http://localhost:5000/api';
+const PROJECTS_API_URL = 'http://localhost:5000/api/projects'; // Task 11
+
+// ==========================================
+// BOOTSTRAP
+// ==========================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 0. Guard access + apply permission-based UI (Task 9)
+    // 0. Guard access + apply permission-based UI
     if (!verifyUserAuth()) return;
     applyPermissionUI();
 
@@ -21,74 +31,27 @@ document.addEventListener('DOMContentLoaded', () => {
     loadUserFiles();
     setupFileUploadListener();
 
-    // 6. Logout button handler
+    // 6. Task 11 — customer's projects
+    loadUserProjects();
+
+    // 7. Logout button
     const logoutBtn = document.getElementById('logoutBtn') || document.getElementById('logout-btn');
     if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
 });
-
-// ==========================================
-// TASK 9: PERMISSION HELPERS
-// ==========================================
-
-function getCurrentUser() {
-    try { return JSON.parse(localStorage.getItem('user') || '{}'); }
-    catch { return {}; }
-}
-
-function can(permission) {
-    const user = getCurrentUser();
-    if (user.role === 'admin') return true;
-    return Array.isArray(user.permissions) && user.permissions.includes(permission);
-}
-
-function applyPermissionUI() {
-    const requestForm = document.getElementById('createRequestForm') || document.getElementById('requestForm');
-    if (requestForm && !can('requests:create_own')) {
-        const wrapper = requestForm.closest('.dash-card') || requestForm.parentElement;
-        if (wrapper) wrapper.style.display = 'none';
-    }
-
-    const requestsContainer = document.getElementById('user-requests-list')
-        || document.getElementById('userRequestsList')
-        || document.getElementById('myRequestsContainer');
-    if (requestsContainer && !can('requests:read_own')) {
-        const wrapper = requestsContainer.closest('.dash-card') || requestsContainer.parentElement;
-        if (wrapper) wrapper.style.display = 'none';
-    }
-}
 
 // ==========================================
 // AUTH GUARD
 // ==========================================
 
 function verifyUserAuth() {
-    const token = localStorage.getItem('token');
-    const user = getCurrentUser();
-    if (!token || !user.email) {
+    const token = getToken();
+    const user = getUser();
+    if (!token || !user) {
         alert('Authentication required. Please log in first.');
         window.location.href = 'login.html';
         return false;
     }
     return true;
-}
-
-function getAuthHeaders() {
-    const token = localStorage.getItem('token');
-    return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-    };
-}
-
-/** File upload uses multipart/form-data — must NOT set Content-Type manually */
-function getUploadHeaders() {
-    const token = localStorage.getItem('token');
-    return { 'Authorization': `Bearer ${token}` };
-}
-
-function handleLogout() {
-    ['token', 'user', 'permissions', 'userRole', 'username'].forEach(k => localStorage.removeItem(k));
-    window.location.href = 'login.html';
 }
 
 // ==========================================
@@ -101,7 +64,9 @@ async function loadUserProfile() {
     if (!nameInput && !emailInput) return;
 
     try {
-        const response = await fetch(`${API_URL}/user/profile`, { headers: getAuthHeaders() });
+        const response = await fetch(`${API_URL}/user/profile`, {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
         const data = await response.json();
 
         if (response.ok && data.success && data.user) {
@@ -138,7 +103,10 @@ function setupProfileFormListener() {
         try {
             const response = await fetch(`${API_URL}/user/profile`, {
                 method: 'PUT',
-                headers: getAuthHeaders(),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${getToken()}`
+                },
                 body: JSON.stringify(payload)
             });
             const data = await response.json();
@@ -182,7 +150,10 @@ function setupRequestFormListener() {
         try {
             const response = await fetch(`${API_URL}/requests`, {
                 method: 'POST',
-                headers: getAuthHeaders(),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${getToken()}`
+                },
                 body: JSON.stringify({ title, description })
             });
             const result = await response.json();
@@ -208,11 +179,13 @@ async function loadUserRequests() {
     if (!requestsContainer) return;
 
     try {
-        const response = await fetch(`${API_URL}/user/requests`, { headers: getAuthHeaders() });
+        const response = await fetch(`${API_URL}/user/requests`, {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
         const result = await response.json();
         const requests = result.data || (Array.isArray(result) ? result : []);
 
-        // Cache for client-side filtering (used in dashboard.html inline filter)
+        // Cache for client-side filtering
         window.__cachedRequests = requests;
 
         if (requests.length === 0) {
@@ -220,7 +193,7 @@ async function loadUserRequests() {
             return;
         }
 
-        // If a client-side filter UI exists, let it handle rendering
+        // If filter UI exists, let it handle rendering
         const filterUI = document.getElementById('userRequestSearch') || document.getElementById('userRequestStatusFilter');
         if (filterUI && typeof window.applyClientFilters === 'function') {
             window.applyClientFilters();
@@ -237,37 +210,108 @@ async function loadUserRequests() {
 /** Shared renderer for request cards (used by fallback + filter) */
 function renderRequests(requests) {
     return requests.map(req => {
-        let badgeColor = '#ffc107';
-        if (req.status === 'In Progress') badgeColor = '#17a2b8';
-        if (req.status === 'Completed') badgeColor = '#28a745';
-        if (req.status === 'Rejected') badgeColor = '#dc3545';
+        let badgeClass = 'badge-pending';
+        if (req.status === 'In Progress') badgeClass = 'badge-progress';
+        if (req.status === 'Completed') badgeClass = 'badge-completed';
+        if (req.status === 'Rejected') badgeClass = 'badge-rejected';
 
         return `
-            <div class="request-card card" style="margin-bottom: 15px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 6px; background-color: #fff;">
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f0f0f0; padding-bottom: 8px; margin-bottom: 10px;">
-                    <h3 style="margin: 0; font-size: 1.1rem; color: #333;">${escapeHTML(req.title)}</h3>
-                    <span style="background-color: ${badgeColor}; color: #fff; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: bold;">
-                        ${escapeHTML(req.status)}
-                    </span>
+            <div class="request-item">
+                <div class="request-header">
+                    <h4 style="font-size: 1.05rem; color: #111827;">${escapeHTML(req.title)}</h4>
+                    <span class="badge ${badgeClass}">${escapeHTML(req.status)}</span>
                 </div>
-                <p style="margin: 10px 0; color: #444; line-height: 1.5;">${escapeHTML(req.description)}</p>
-                <small style="color: #888;">Submitted on: ${new Date(req.createdAt || Date.now()).toLocaleDateString()}</small>
+                <p style="color: #4B5563; font-size: 0.95rem; margin-bottom: 0.5rem; line-height: 1.4;">${escapeHTML(req.description)}</p>
+                <small style="color: #9CA3AF;">Submitted: ${new Date(req.createdAt || Date.now()).toLocaleDateString()}</small>
             </div>
         `;
     }).join('');
 }
 
 // ==========================================
+// TASK 11: MY PROJECTS (Customer View)
+// ==========================================
+
+/**
+ * Load and render the customer's own projects.
+ * Backend already filters by `client: req.user.id` for customers.
+ */
+async function loadUserProjects() {
+    const container = document.getElementById('userProjectsList');
+    if (!container) return;
+
+    // Hide section if user lacks projects:read
+    if (!can('projects:read')) {
+        const wrapper = container.closest('.dash-card') || container.parentElement;
+        if (wrapper) wrapper.style.display = 'none';
+        return;
+    }
+
+    try {
+        const result = await apiFetch('/projects');
+
+        if (!result.success) {
+            container.innerHTML = `<p style="text-align:center; color:#EF4444;">${escapeHTML(result.message || 'Failed to load projects.')}</p>`;
+            return;
+        }
+
+        const projects = result.data || [];
+        if (projects.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#6B7280;">No projects assigned to you yet.</p>';
+            return;
+        }
+
+        container.innerHTML = projects.map(p => {
+            const badgeClass = getProjectBadgeClass(p.status);
+            const members = Array.isArray(p.assignedMembers) && p.assignedMembers.length > 0
+                ? `<div class="project-members">
+                     ${p.assignedMembers.map(m => `<span class="member-chip">${escapeHTML(m.name || 'Member')}</span>`).join('')}
+                   </div>`
+                : '';
+
+            return `
+                <div class="project-item">
+                    <div class="project-header">
+                        <h4 style="font-size: 1.05rem; color: #111827;">${escapeHTML(p.name)}</h4>
+                        <span class="badge ${badgeClass}">${escapeHTML(p.status)}</span>
+                    </div>
+                    <p style="color: #4B5563; font-size: 0.95rem; line-height: 1.4;">${escapeHTML(p.description)}</p>
+                    <div class="project-meta">
+                        Created: ${new Date(p.createdAt || Date.now()).toLocaleDateString()}
+                    </div>
+                    ${members}
+                </div>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading projects:', error);
+        container.innerHTML = '<p style="text-align:center; color:#EF4444;">Failed to load projects.</p>';
+    }
+}
+
+/** Map project status → CSS badge class */
+function getProjectBadgeClass(status) {
+    switch (status) {
+        case 'In Progress': return 'badge-progress';
+        case 'Completed':   return 'badge-completed';
+        case 'On Hold':     return 'badge-on-hold';
+        case 'Not Started':
+        default:            return 'badge-not-started';
+    }
+}
+
+// ==========================================
 // TASK 10: FILE & DOCUMENT MANAGEMENT
 // ==========================================
 
-/** Load and render the current user's uploaded files */
 async function loadUserFiles() {
     const container = document.getElementById('userFilesList');
     if (!container) return;
 
     try {
-        const response = await fetch(`${API_URL}/user/files`, { headers: getAuthHeaders() });
+        const response = await fetch(`${API_URL}/user/files`, {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
         const result = await response.json();
 
         if (!response.ok || !result.success) {
@@ -301,7 +345,6 @@ async function loadUserFiles() {
     }
 }
 
-/** Attach upload form listener (multipart/form-data) */
 function setupFileUploadListener() {
     const form = document.getElementById('fileUploadForm');
     const input = document.getElementById('fileInput');
@@ -319,7 +362,6 @@ function setupFileUploadListener() {
 
         const file = input.files[0];
 
-        // Client-side quick check (server also validates)
         const MAX_MB = 10;
         if (file.size > MAX_MB * 1024 * 1024) {
             if (msg) { msg.style.color = '#EF4444'; msg.textContent = `File too large. Max size is ${MAX_MB} MB.`; }
@@ -335,7 +377,8 @@ function setupFileUploadListener() {
         try {
             const response = await fetch(`${API_URL}/files`, {
                 method: 'POST',
-                headers: getUploadHeaders(), // do NOT set Content-Type manually
+                // Do NOT set Content-Type manually for multipart/form-data
+                headers: { 'Authorization': `Bearer ${getToken()}` },
                 body: fd
             });
             const result = await response.json();
@@ -356,14 +399,13 @@ function setupFileUploadListener() {
     });
 }
 
-/** Delete the current user's own file */
 async function deleteUserFile(fileId, fileName) {
     if (!confirm(`Delete "${fileName}"? This cannot be undone.`)) return;
 
     try {
         const response = await fetch(`${API_URL}/user/files/${fileId}`, {
             method: 'DELETE',
-            headers: getAuthHeaders()
+            headers: { 'Authorization': `Bearer ${getToken()}` }
         });
         const result = await response.json();
 
@@ -376,21 +418,4 @@ async function deleteUserFile(fileId, fileName) {
         console.error('Delete file error:', error);
         alert('Server error while deleting file.');
     }
-}
-
-// ==========================================
-// UTILITIES
-// ==========================================
-
-function escapeHTML(str) {
-    if (!str) return '';
-    return String(str).replace(/[&<>'"]/g,
-        tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
-    );
-}
-
-/** Escape single quotes for inline onclick handlers */
-function escapeQuotes(str) {
-    if (!str) return '';
-    return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
